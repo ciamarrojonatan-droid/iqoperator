@@ -21,12 +21,12 @@ from typing import Tuple, Optional, List, Dict, Any
 
 log = logging.getLogger("iqrobot.ml_filter")
 
-DEFAULT_MODEL_PATH = os.path.join(os.path.dirname(__file__), "models", "xgb_filter.pkl")
+DEFAULT_MODEL_PATH = os.path.join(os.path.dirname(__file__), "models", "xgb_filter_v2.pkl")
 DEFAULT_THRESHOLD = 0.62
-# Requer no mínimo 61 candles para shift(1) + rolling(60) de Donchian
-MIN_CANDLE_COUNT = 61
+# Requer no mínimo 100 candles para EMA simulação de MTF M15
+MIN_CANDLE_COUNT = 100
 
-# 53 Features Técnicas e Cíclicas na ordenação estrita do modelo treinado
+# 72 Features Técnicas e Cíclicas na ordenação estrita do modelo treinado
 FEATURE_COLS: Tuple[str, ...] = (
     'sig_df_dir', 'sig_bb_dir', 'sig_agreement', 'sig_confluence_dir',
     'sin_hour', 'cos_hour', 'sin_dow', 'cos_dow', 'sin_tod', 'cos_tod',
@@ -42,7 +42,13 @@ FEATURE_COLS: Tuple[str, ...] = (
     'dc_width_40', 'dc_pct_40',
     'dc_width_60', 'dc_pct_60',
     'body_ratio', 'upper_wick_ratio', 'lower_wick_ratio',
-    'ret_1', 'ret_3', 'ret_5'
+    'ret_1', 'ret_3', 'ret_5',
+    'rsi_14', 'macd', 'macd_signal', 'macd_hist', 'stoch_k', 'stoch_d', 
+    'atr_14', 'kc_pct', 'dist_ema_m5', 'dist_ema_m15', 
+    'dist_vwap_20', 'vroc_5', 'vsa_vol_spread', 
+    'fractal_up_conf', 'fractal_down_conf', 
+    'bullish_engulfing', 'bearish_engulfing', 
+    'wick_upper_z', 'wick_lower_z'
 )
 
 
@@ -105,7 +111,7 @@ class MLFilter:
                     self.scaler = sc
                 else:
                     self.scaler = None
-                self.is_loaded = bool(self.model is not None and len(self.feature_cols) == 53)
+                self.is_loaded = bool(self.model is not None and len(self.feature_cols) >= 53)
             else:
                 with open(self.model_path, "rb") as f:
                     data = pickle.load(f)
@@ -115,7 +121,7 @@ class MLFilter:
                 self.feature_cols = data.get("feature_cols", list(FEATURE_COLS))
                 self.threshold = float(data.get("threshold", self.threshold))
                 self.meta = data.get("meta", {})
-                self.is_loaded = bool(self.model is not None and len(self.feature_cols) == 53)
+                self.is_loaded = bool(self.model is not None and len(self.feature_cols) >= 53)
 
             elapsed_ms = (time.perf_counter() - t0) * 1000
             if self.is_loaded:
@@ -290,8 +296,102 @@ class MLFilter:
             ret = d["close"].pct_change(lag)
             d[f"ret_{lag}"] = ret.replace([np.inf, -np.inf], 0.0).fillna(0.0)
 
-        # Extrai apenas a última linha (candle atual) no formato exato das 53 features
-        cols_to_extract = self.feature_cols if (self.feature_cols and len(self.feature_cols) == 53) else list(FEATURE_COLS)
+        # --- NOVAS FEATURES (19 features) ---
+        # 11. Momentum/Oscillators (RSI, MACD, Stochastic)
+        # RSI 14
+        delta = d["close"].diff()
+        gain = (delta.where(delta > 0, 0)).rolling(14).mean()
+        loss = (-delta.where(delta < 0, 0)).rolling(14).mean()
+        rs = gain / (loss + 1e-9)
+        d["rsi_14"] = 100 - (100 / (1 + rs))
+        d["rsi_14"] = d["rsi_14"].fillna(50.0)
+
+        # MACD (12, 26, 9)
+        ema_12 = d["close"].ewm(span=12, adjust=False).mean()
+        ema_26 = d["close"].ewm(span=26, adjust=False).mean()
+        d["macd"] = ema_12 - ema_26
+        d["macd_signal"] = d["macd"].ewm(span=9, adjust=False).mean()
+        d["macd_hist"] = d["macd"] - d["macd_signal"]
+
+        # Stochastic (14, 3)
+        lowest_low = d["low"].rolling(14).min()
+        highest_high = d["high"].rolling(14).max()
+        d["stoch_k"] = 100 * (d["close"] - lowest_low) / (highest_high - lowest_low + 1e-9)
+        d["stoch_d"] = d["stoch_k"].rolling(3).mean()
+        d["stoch_k"] = d["stoch_k"].fillna(50.0)
+        d["stoch_d"] = d["stoch_d"].fillna(50.0)
+
+        # 12. Dynamic Volatility (ATR, Keltner)
+        # ATR 14
+        tr1 = d["high"] - d["low"]
+        tr2 = (d["high"] - d["close"].shift(1)).abs()
+        tr3 = (d["low"] - d["close"].shift(1)).abs()
+        tr = pd.concat([tr1, tr2, tr3], axis=1).max(axis=1)
+        d["atr_14"] = tr.rolling(14).mean().bfill()
+
+        # Keltner Channel (20, 2)
+        ema_20 = d["close"].ewm(span=20, adjust=False).mean()
+        kc_upper = ema_20 + 2 * d["atr_14"]
+        kc_lower = ema_20 - 2 * d["atr_14"]
+        d["kc_pct"] = (d["close"] - kc_lower) / (kc_upper - kc_lower + 1e-9)
+
+        # 13. Simulated MTF (M5/M15 EMA projections in M1)
+        ema_m5_sim = d["close"].ewm(span=25, adjust=False).mean()
+        ema_m15_sim = d["close"].ewm(span=75, adjust=False).mean()
+        d["dist_ema_m5"] = (d["close"] - ema_m5_sim) / (ema_m5_sim + 1e-9)
+        d["dist_ema_m15"] = (d["close"] - ema_m15_sim) / (ema_m15_sim + 1e-9)
+
+        # 14. Volume/Order Flow (VWAP, VROC, VSA)
+        if "volume" not in d.columns:
+            d["volume"] = 1.0
+        else:
+            d["volume"] = pd.to_numeric(d["volume"], errors="coerce").fillna(1.0)
+            
+        vol_sum_20 = d["volume"].rolling(20).sum()
+        vwap_20 = (d["close"] * d["volume"]).rolling(20).sum() / (vol_sum_20 + 1e-9)
+        d["dist_vwap_20"] = (d["close"] - vwap_20) / (vwap_20 + 1e-9)
+        d["dist_vwap_20"] = d["dist_vwap_20"].fillna(0.0)
+
+        vroc_5 = d["volume"].pct_change(5).fillna(0.0)
+        d["vroc_5"] = vroc_5.replace([np.inf, -np.inf], 0.0)
+
+        d["vsa_vol_spread"] = d["volume"] / bar_rng
+
+        # 15. Advanced Price Action (Fractals, Engulfing, wick z-scores)
+        # Zero-lookahead fractals (confirmed at T-2)
+        d["fractal_up_conf"] = ((d["high"].shift(2) > d["high"].shift(3)) & 
+                                (d["high"].shift(2) > d["high"].shift(4)) & 
+                                (d["high"].shift(2) > d["high"].shift(1)) & 
+                                (d["high"].shift(2) > d["high"])).astype(int)
+        d["fractal_down_conf"] = ((d["low"].shift(2) < d["low"].shift(3)) & 
+                                  (d["low"].shift(2) < d["low"].shift(4)) & 
+                                  (d["low"].shift(2) < d["low"].shift(1)) & 
+                                  (d["low"].shift(2) < d["low"])).astype(int)
+
+        # Engulfing (current vs previous)
+        prev_body = d["close"].shift(1) - d["open"].shift(1)
+        curr_body = d["close"] - d["open"]
+        d["bullish_engulfing"] = ((prev_body < 0) & (curr_body > 0) & 
+                                  (d["close"] > d["open"].shift(1)) & 
+                                  (d["open"] < d["close"].shift(1))).astype(int)
+        d["bearish_engulfing"] = ((prev_body > 0) & (curr_body < 0) & 
+                                  (d["close"] < d["open"].shift(1)) & 
+                                  (d["open"] > d["close"].shift(1))).astype(int)
+
+        # Wick z-scores
+        mean_uw = d["upper_wick_ratio"].rolling(20).mean()
+        std_uw = d["upper_wick_ratio"].rolling(20).std()
+        d["wick_upper_z"] = (d["upper_wick_ratio"] - mean_uw) / (std_uw + 1e-9)
+        
+        mean_lw = d["lower_wick_ratio"].rolling(20).mean()
+        std_lw = d["lower_wick_ratio"].rolling(20).std()
+        d["wick_lower_z"] = (d["lower_wick_ratio"] - mean_lw) / (std_lw + 1e-9)
+
+        d["wick_upper_z"] = d["wick_upper_z"].fillna(0.0)
+        d["wick_lower_z"] = d["wick_lower_z"].fillna(0.0)
+
+        # Extrai apenas a última linha (candle atual) no formato exato das features
+        cols_to_extract = self.feature_cols if self.feature_cols else list(FEATURE_COLS)
         latest_row = d.iloc[[-1]][cols_to_extract].copy()
 
         # Verificação estrita de sanidade numérica (rejeita NaN e Inf)

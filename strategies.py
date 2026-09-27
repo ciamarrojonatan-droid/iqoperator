@@ -243,6 +243,76 @@ def ema_cross_signal(df: pd.DataFrame, fast: int = 9, slow: int = 21,
     return None
 
 
+def mhi_1_signal(
+    df: pd.DataFrame,
+    trend_ema: int = 100,
+    require_trend: bool = True,
+) -> str | None:
+    """
+    Estratégia Probabilística MHI 1 (Minoria em M1):
+    - Analisa as cores das velas 3, 4 e 5 de cada quadrante de 5 minutos (fechamento em :04, :09, :14...).
+    - Entra a favor da cor minoritária na Vela 1 do próximo quadrante (:00, :05, :10...).
+    - Filtro Anti-Doji: se qualquer uma das 3 velas for Doji (open == close), aborta (None).
+    - Filtro de Micro-Tendência: se require_trend=True, CALL exige close > EMA(trend_ema), PUT exige close < EMA(trend_ema).
+    """
+    if df is None or len(df) < 5:
+        return None
+
+    # Identificar timestamp do candle fechado
+    last_candle = df.iloc[-1]
+    ts = None
+    for col in ("from", "at", "open_time", "time", "date", "timestamp"):
+        if col in df.columns:
+            try:
+                v = int(float(last_candle[col]))
+                if v > 0:
+                    ts = v
+                    break
+            except (ValueError, TypeError):
+                continue
+
+    # Se timestamp disponível, valida se o candle fechado é o 5º do quadrante de 5m (:04, :09, ...)
+    if ts is not None:
+        minute_mod = (ts // 60) % 5
+        if minute_mod != 4:
+            return None
+
+    # Analisar cores das últimas 3 velas do quadrante (Velas 3, 4 e 5)
+    sample = df.iloc[-3:]
+    colors = []
+    for _, row in sample.iterrows():
+        o = float(row.get("open", 0))
+        c = float(row.get("close", 0))
+        if c > o:
+            colors.append("green")
+        elif c < o:
+            colors.append("red")
+        else:
+            return None  # Anti-Doji: indecisão detectada
+
+    greens = colors.count("green")
+    reds = colors.count("red")
+
+    if greens > reds:
+        signal = "put"
+    elif reds > greens:
+        signal = "call"
+    else:
+        return None
+
+    # Filtro de micro-tendência EMA
+    if require_trend and len(df) >= trend_ema:
+        ema = df["close"].ewm(span=trend_ema, adjust=False).mean()
+        last_close = float(df["close"].iloc[-1])
+        last_ema = float(ema.iloc[-1])
+        if signal == "call" and last_close <= last_ema:
+            return None
+        if signal == "put" and last_close >= last_ema:
+            return None
+
+    return signal
+
+
 def get_signal(strategy: str, df: pd.DataFrame, cfg, df_htf: pd.DataFrame | None = None) -> str | None:
     if strategy == "donchian_fade":
         return donchian_fade_signal(df, n=cfg.DONCHIAN_N)
@@ -297,5 +367,11 @@ def get_signal(strategy: str, df: pd.DataFrame, cfg, df_htf: pd.DataFrame | None
             rsi_period=cfg.RSI_PERIOD,
             rsi_ob=cfg.RSI_OVERBOUGHT,
             rsi_os=cfg.RSI_OVERSOLD,
+        )
+    if strategy == "mhi_1":
+        return mhi_1_signal(
+            df,
+            trend_ema=getattr(cfg, "MHI_TREND_EMA", 100),
+            require_trend=getattr(cfg, "MHI_REQUIRE_TREND", True),
         )
     return None

@@ -107,10 +107,15 @@ RSI_OVERBOUGHT = _get_float("RSI_OVERBOUGHT", 70)
 RSI_OVERSOLD = _get_float("RSI_OVERSOLD", 30)
 BB_PERIOD = _get_int("BB_PERIOD", 20)
 BB_MULT = _get_float("BB_MULT", 2.0)
+MHI_TREND_EMA = _get_int("IQ_MHI_TREND_EMA", 100)
+MHI_REQUIRE_TREND = os.getenv("IQ_MHI_REQUIRE_TREND", "1") == "1"
 
 # Filtro Preditivo ML (XGBoost tau=0.62)
 USE_ML_FILTER = os.getenv("USE_ML_FILTER", "1") == "1"
-ML_MODEL_PATH = os.getenv("ML_MODEL_PATH", "models/xgb_filter.pkl")
+ML_MODEL_PATH = os.getenv("ML_MODEL_PATH", "models/xgb_filter_v2.pkl")
 ML_THRESHOLD = _get_float("ML_THRESHOLD", 0.62)
 ML_FAIL_OPEN = os.getenv("ML_FAIL_OPEN", "0") == "1"
+
+# Toxic hours: hours in UTC where trading is blocked
+BLOCKED_HOURS_UTC = [int(h) for h in _get_list("BLOCKED_HOURS_UTC", ["5", "8", "12", "21", "23"])]
 

@@ -1,4 +1,4 @@
-﻿"""RobÃ´ IQOption DEMO - BinÃ¡rias multi-ativo OTC | donchian_fade M15 + Kelly 2%.
+"""RobÃ´ IQOption DEMO - BinÃ¡rias multi-ativo OTC | donchian_fade M15 + Kelly 2%.
 
 - Opera todos os cfg.ASSETS em ciclo sequencial (1 scan ~= todos os ativos).
 - Resultado de trade NÃƒO bloqueia o loop: posiÃ§Ãµes ficam em self.pending e sÃ£o
@@ -25,6 +25,7 @@ from kelly import kelly_fraction_stake, empirical_winrate
 from hf_sync import sync_file, download_file
 from homeostasis import HomeostasisManager
 from ml_filter import MLFilter
+from news_filter import NewsFilter
 
 
 logging.basicConfig(
@@ -92,7 +93,9 @@ class Bot:
         self._hard_reconnect_count = 0
         self._trade_log_init()
         self._load_pending()
-        self.ml_filter = MLFilter(cfg.ML_MODEL_PATH, cfg.ML_THRESHOLD, fail_open=cfg.ML_FAIL_OPEN) if cfg.USE_ML_FILTER else None
+        model_path = "models/xgb_filter_m5.pkl" if cfg.TIMEFRAME == 300 else cfg.ML_MODEL_PATH
+        self.ml_filter = MLFilter(model_path, cfg.ML_THRESHOLD, fail_open=cfg.ML_FAIL_OPEN) if cfg.USE_ML_FILTER else None
+        self.news_filter = NewsFilter()
 
 
     # ---------- chamadas com timeout ----------
@@ -785,11 +788,21 @@ class Bot:
 
                     subset = self._next_subset()
                     got = 0
+                    current_utc = datetime.now(timezone.utc)
+                    is_toxic = current_utc.hour in cfg.BLOCKED_HOURS_UTC
+                    is_news = self.news_filter.is_news_time(current_utc)
+                    
                     for i, asset in enumerate(subset):
                         self._touch_progress()
                         if i:
                             time.sleep(cfg.ASSET_DELAY)
                         if self._in_cooldown(asset):
+                            continue
+                        if is_toxic:
+                            if i == 0: log.info(f"Toxic Hour ({current_utc.hour} UTC) - skipping scan.")
+                            continue
+                        if is_news:
+                            if i == 0: log.info(f"High Impact News Time - skipping scan.")
                             continue
                         payout = self.get_payout(asset, detail)
                         if payout < cfg.PAYOUT_MIN:
@@ -859,7 +872,7 @@ class Bot:
                                           "payout": payout, "p": p, "kfull": kfull})
                             self.pending.append(order)
                             self._save_pending()
-                    if got == 0:
+                    if got == 0 and not (is_toxic or is_news):
                         self._empty_scans += 1
                         self._consecutive_global_fails += 1
                         if self._consecutive_global_fails >= cfg.MAX_GLOBAL_ERRORS:
@@ -872,7 +885,7 @@ class Bot:
                             self._empty_scans = 0
                             self._quiet_until = time.time() + cfg.GLOBAL_COOLDOWN
                             log.warning(f"Disjuntor global: 3 scans sem candles â€” silÃªncio de {cfg.GLOBAL_COOLDOWN}s p/ resetar o throttle.")
-                    else:
+                    elif got > 0 or is_toxic or is_news:
                         self._empty_scans = 0
                         self._consecutive_global_fails = 0
                         self._hard_reconnect_count = 0  # conexÃ£o saudÃ¡vel, reseta
