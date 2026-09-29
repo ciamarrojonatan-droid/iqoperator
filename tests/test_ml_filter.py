@@ -27,7 +27,7 @@ class TestMLFilterIntegration(unittest.TestCase):
     def test_filter_load_and_structure(self):
         """Verifica se o artefato pkl foi carregado corretamente na suíte de testes."""
         self.assertTrue(self.filter.is_loaded)
-        self.assertEqual(len(self.filter.feature_cols), 53)
+        self.assertEqual(len(self.filter.feature_cols), 72)
         self.assertEqual(self.filter.threshold, 0.62)
 
     def test_json_model_artifact_loading(self):
@@ -35,12 +35,12 @@ class TestMLFilterIntegration(unittest.TestCase):
         if os.path.exists(self.json_path):
             json_filter = MLFilter(model_path=self.json_path)
             self.assertTrue(json_filter.is_loaded, "O arquivo nativo .json deve ser carregado com sucesso.")
-            self.assertEqual(len(json_filter.feature_cols), 53, "JSON booster deve expor as 53 features.")
+            self.assertEqual(len(json_filter.feature_cols), 53, "JSON booster deve expor as 72 features.")
             self.assertEqual(json_filter.threshold, 0.62)
 
     def test_mock_candle_inference(self):
         """Verifica que candle mockado processa o vetor e gera probabilidade válida sem erros de tipagem."""
-        n_bars = 75
+        n_bars = 110
         base_ts = 1700000000
         timestamps = [base_ts + i * 900 for i in range(n_bars)]
         prices = [1.0800 + (i * 0.0001) for i in range(n_bars)]
@@ -56,7 +56,7 @@ class TestMLFilterIntegration(unittest.TestCase):
 
         feat = self.filter.compute_features(df)
         self.assertIsInstance(feat, pd.DataFrame)
-        self.assertEqual(feat.shape, (1, 53))
+        self.assertEqual(feat.shape, (1, 72))
 
         prob = self.filter.predict_proba(df)
         self.assertIsInstance(prob, float)
@@ -69,7 +69,7 @@ class TestMLFilterIntegration(unittest.TestCase):
 
     def test_intermittent_nan_resilience(self):
         """Verifica resiliência contra ticks/valores NaN introduzidos por perda de pacotes websocket."""
-        n_bars = 80
+        n_bars = 110
         base_ts = 1700000000
         timestamps = [base_ts + i * 900 for i in range(n_bars)]
         prices = [1.0800 + (i * 0.0001) for p, i in enumerate(range(n_bars))]
@@ -92,7 +92,7 @@ class TestMLFilterIntegration(unittest.TestCase):
 
     def test_string_timestamp_and_reverse_order(self):
         """Verifica suporte a strings ISO e ordenação estrita mesmo se dados chegarem invertidos."""
-        n_bars = 70
+        n_bars = 110
         now = pd.Timestamp.now(tz="UTC")
         datetimes = [str(now - pd.Timedelta(minutes=15 * (n_bars - i))) for i in range(n_bars)]
         prices = [1.0800 + (i * 0.0001) for i in range(n_bars)]
@@ -122,7 +122,7 @@ class TestMLFilterIntegration(unittest.TestCase):
 
     def test_signal_casing_and_normalization(self):
         """Verifica que sinais em maiúsculas ('CALL', 'PUT') e com espaços são aceitos."""
-        n_bars = 70
+        n_bars = 110
         df = pd.DataFrame({
             "time": [1700000000 + i * 900 for i in range(n_bars)],
             "open": [1.0850] * n_bars,
@@ -159,7 +159,7 @@ class TestMLFilterIntegration(unittest.TestCase):
             bot = Bot()
             
             # Mock de candles
-            n_bars = 70
+            n_bars = 110
             df = pd.DataFrame({
                 "from": [1700000000 + i * 900 for i in range(n_bars)],
                 "open": [1.0850] * n_bars,
@@ -185,7 +185,7 @@ class TestMLFilterIntegration(unittest.TestCase):
             self.assertEqual(prob, 0.68)
 
     def test_fail_closed_and_fail_open_policies(self):
-        """Verifica que buffer < 61 candles cancela por padrão (fail-closed) e bypassa se fail-open."""
+        """Verifica que buffer < 101 candles cancela por padrão (fail-closed) e bypassa se fail-open."""
         df_60 = pd.DataFrame({
             "open": [1.1000] * 60, "high": [1.1010] * 60,
             "low": [1.0990] * 60, "close": [1.1005] * 60
@@ -204,8 +204,8 @@ class TestMLFilterIntegration(unittest.TestCase):
         """Verifica que filtro descarregado barra trades em fail-closed e permite em fail-open."""
         unloaded = MLFilter(model_path="nonexistent.pkl", fail_open=False)
         df = pd.DataFrame({
-            "time": [1700000000 + i * 900 for i in range(70)],
-            "open": [1.08] * 70, "high": [1.09] * 70, "low": [1.07] * 70, "close": [1.08] * 70
+            "time": [1700000000 + i * 900 for i in range(110)],
+            "open": [1.08] * 110, "high": [1.09] * 110, "low": [1.07] * 110, "close": [1.08] * 110
         })
         allowed, prob = unloaded.filter_signal(df, "call")
         self.assertFalse(allowed)
@@ -217,7 +217,7 @@ class TestMLFilterIntegration(unittest.TestCase):
 
     def test_candle_physical_integrity(self):
         """Verifica higienização de anomalias de candles (high < low, close > high) sem valores negativos ou infinitos."""
-        n_bars = 70
+        n_bars = 110
         df = pd.DataFrame({
             "time": [1700000000 + i * 900 for i in range(n_bars)],
             "open": [1.0850] * n_bars,
@@ -234,7 +234,7 @@ class TestMLFilterIntegration(unittest.TestCase):
 
     def test_string_numeric_timestamp_parsing(self):
         """Verifica que strings numéricas de timestamp são tratadas sem erro de parsing de data."""
-        n_bars = 70
+        n_bars = 110
         df = pd.DataFrame({
             "time": [str(1700000000 + i * 900) for i in range(n_bars)],
             "open": [1.0850] * n_bars, "high": [1.0860] * n_bars,
@@ -245,8 +245,8 @@ class TestMLFilterIntegration(unittest.TestCase):
 
     def test_zero_price_resilience(self):
         """Verifica que preços zerados ou com transição súbita não geram NaNs ou Infs."""
-        n_bars = 70
-        prices = [0.0] * 68 + [1.0, 1.0]
+        n_bars = 110
+        prices = [0.0] * 108 + [1.0, 1.0]
         df = pd.DataFrame({
             "time": [1700000000 + i * 900 for i in range(n_bars)],
             "open": prices, "high": [p + 0.1 for p in prices],
@@ -263,7 +263,7 @@ class TestMLFilterIntegration(unittest.TestCase):
         self.assertIsNotNone(f_singleton)
         self.assertTrue(f_singleton.is_loaded)
 
-        n_bars = 70
+        n_bars = 110
         df = pd.DataFrame({
             "time": [1700000000 + i * 900 for i in range(n_bars)],
             "open": [1.0850] * n_bars, "high": [1.0860] * n_bars,
@@ -285,7 +285,7 @@ class TestMLFilterIntegration(unittest.TestCase):
 
     def test_timestamp_deduplication(self):
         """Verifica que duplicatas temporais em websocket reconnects são filtradas sem corromper featurização."""
-        n_bars = 75
+        n_bars = 110
         base_ts = 1700000000
         timestamps = [base_ts + i * 900 for i in range(n_bars)]
         prices = [1.0800 + (i * 0.0001) for i in range(n_bars)]
@@ -302,7 +302,7 @@ class TestMLFilterIntegration(unittest.TestCase):
         })
 
         feat = self.filter.compute_features(df)
-        self.assertEqual(feat.shape, (1, 53))
+        self.assertEqual(feat.shape, (1, 72))
         self.assertFalse(feat.isnull().any().any())
 
     def test_json_automatic_fallback(self):
@@ -331,8 +331,8 @@ class TestMLFilterIntegration(unittest.TestCase):
     def test_exception_fail_open_consistency(self):
         """Verifica que exceções no cálculo de features respeitam a configuração de fail_open."""
         df_corrupt = pd.DataFrame({
-            "time": [1700000000 + i * 900 for i in range(70)],
-            "open": [np.nan] * 70, "high": [np.nan] * 70, "low": [np.nan] * 70, "close": [np.nan] * 70
+            "time": [1700000000 + i * 900 for i in range(110)],
+            "open": [np.nan] * 110, "high": [np.nan] * 110, "low": [np.nan] * 110, "close": [np.nan] * 110
         })
         allowed_fc, p_fc = self.filter.filter_signal(df_corrupt, "call", fail_open=False)
         self.assertFalse(allowed_fc)

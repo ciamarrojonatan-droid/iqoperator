@@ -471,6 +471,93 @@ class MLFilter:
                 return False, 0.0
 
 
+class LayaFilter(MLFilter):
+    """Filtro preditivo baseado no modelo open-source Laya (distilbert)."""
+    def __init__(self, model_name: str = "convaiinnovations/laya", threshold: float = 0.5, fail_open: bool = False):
+        self.model_name = model_name
+        self.threshold = threshold
+        self.fail_open = fail_open
+        self.model = None
+        self.tokenizer = None
+        self.feature_cols: List[str] = list(FEATURE_COLS)
+        self.is_loaded = False
+        self._load_model()
+
+    def _load_model(self) -> bool:
+        try:
+            import torch
+            from transformers import AutoModelForSequenceClassification, AutoTokenizer
+        except Exception as e:
+            log.error(f"[LAYA FILTER] Environment Error: Failed to import torch or transformers. Exceção: {e}")
+            self.is_loaded = False
+            return False
+            
+        try:
+            log.info(f"[LAYA FILTER] Tentando carregar {self.model_name}...")
+            self.tokenizer = AutoTokenizer.from_pretrained(self.model_name, subfolder="tokenizer")
+            self.model = AutoModelForSequenceClassification.from_pretrained(self.model_name, num_labels=2, subfolder="encoder")
+            self.model.eval()
+            self.is_loaded = True
+        except Exception as e:
+            log.warning(f"[LAYA FILTER] Falha ao carregar {self.model_name} nativamente: {e}. Fallback para distilbert-base-uncased.")
+            try:
+                self.model_name = "distilbert-base-uncased"
+                self.tokenizer = AutoTokenizer.from_pretrained(self.model_name)
+                self.model = AutoModelForSequenceClassification.from_pretrained(self.model_name, num_labels=2)
+                self.model.eval()
+                self.is_loaded = True
+            except Exception as e2:
+                log.error(f"[LAYA FILTER] Fallback falhou: {e2}")
+                self.is_loaded = False
+                
+        if self.is_loaded:
+            log.info(f"[LAYA FILTER] Modelo carregado com sucesso ({self.model_name}, tau={self.threshold:.2f})")
+        return self.is_loaded
+
+    def predict_proba(self, df: pd.DataFrame) -> float:
+        if not self.is_loaded:
+            raise RuntimeError("LayaFilter: Modelo não está carregado.")
+
+        feat = self.compute_features(df)
+        
+        rsi = feat['rsi_14'].iloc[0] if 'rsi_14' in feat else 'unknown'
+        bb_dist = feat['bb_pct_b'].iloc[0] if 'bb_pct_b' in feat else 'unknown'
+        macd_hist = feat['macd_hist'].iloc[0] if 'macd_hist' in feat else 'unknown'
+        
+        bullish_eng = feat['bullish_engulfing'].iloc[0] if 'bullish_engulfing' in feat else 0
+        bearish_eng = feat['bearish_engulfing'].iloc[0] if 'bearish_engulfing' in feat else 0
+        
+        eng_text = "none"
+        if bullish_eng == 1:
+            eng_text = "bullish engulfing"
+        elif bearish_eng == 1:
+            eng_text = "bearish engulfing"
+
+        if isinstance(rsi, float): rsi = round(rsi, 2)
+        if isinstance(bb_dist, float): bb_dist = round(bb_dist, 4)
+        if isinstance(macd_hist, float): macd_hist = round(macd_hist, 4)
+            
+        state_description = (
+            f"Market conditions: RSI is {rsi}. "
+            f"Bollinger Band distance is {bb_dist}. "
+            f"MACD histogram is {macd_hist}. "
+            f"Engulfing features: {eng_text}."
+        )
+        
+        log.info(f"[LAYA FILTER] Input context: {state_description}")
+        
+        import torch
+        inputs = self.tokenizer(state_description, return_tensors="pt", truncation=True, max_length=128)
+        
+        with torch.no_grad():
+            outputs = self.model(**inputs)
+            logits = outputs.logits
+            probabilities = torch.softmax(logits, dim=1)
+            buy_prob = probabilities[0][1].item()
+            
+        return float(buy_prob)
+
+
 # Instância singleton global para reuso eficiente com lock de concorrência
 _filter_lock = threading.Lock()
 _global_filter: Optional[MLFilter] = None
@@ -481,6 +568,10 @@ def get_ml_filter(model_path: Optional[str] = None, threshold: float = DEFAULT_T
     if _global_filter is None:
         with _filter_lock:
             if _global_filter is None:
-                _global_filter = MLFilter(model_path=model_path, threshold=threshold, fail_open=fail_open)
+                import config as cfg
+                if getattr(cfg, "USE_LAYA_ORACLE", False):
+                    _global_filter = LayaFilter(model_name=getattr(cfg, "LAYA_MODEL_NAME", "convaiinnovations/laya"), threshold=threshold, fail_open=fail_open)
+                else:
+                    _global_filter = MLFilter(model_path=model_path, threshold=threshold, fail_open=fail_open)
     return _global_filter
 

@@ -110,8 +110,10 @@ BB_MULT = _get_float("BB_MULT", 2.0)
 MHI_TREND_EMA = _get_int("IQ_MHI_TREND_EMA", 100)
 MHI_REQUIRE_TREND = os.getenv("IQ_MHI_REQUIRE_TREND", "1") == "1"
 
-# Filtro Preditivo ML (XGBoost tau=0.62)
+# Filtro Preditivo ML (XGBoost tau=0.62 ou Laya)
 USE_ML_FILTER = os.getenv("USE_ML_FILTER", "1") == "1"
+USE_LAYA_ORACLE = os.getenv("USE_LAYA_ORACLE", "0") == "1"
+LAYA_MODEL_NAME = os.getenv("LAYA_MODEL_NAME", "convaiinnovations/laya")
 ML_MODEL_PATH = os.getenv("ML_MODEL_PATH", "models/xgb_filter_v2.pkl")
 ML_THRESHOLD = _get_float("ML_THRESHOLD", 0.62)
 ML_FAIL_OPEN = os.getenv("ML_FAIL_OPEN", "0") == "1"

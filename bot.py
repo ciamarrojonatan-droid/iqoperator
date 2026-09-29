@@ -93,8 +93,15 @@ class Bot:
         self._hard_reconnect_count = 0
         self._trade_log_init()
         self._load_pending()
-        model_path = "models/xgb_filter_m5.pkl" if cfg.TIMEFRAME == 300 else cfg.ML_MODEL_PATH
-        self.ml_filter = MLFilter(model_path, cfg.ML_THRESHOLD, fail_open=cfg.ML_FAIL_OPEN) if cfg.USE_ML_FILTER else None
+        if cfg.USE_ML_FILTER:
+            if getattr(cfg, "USE_LAYA_ORACLE", False):
+                from ml_filter import LayaFilter
+                self.ml_filter = LayaFilter(model_name=getattr(cfg, "LAYA_MODEL_NAME", "convaiinnovations/laya"), fail_open=cfg.ML_FAIL_OPEN)
+            else:
+                model_path = "models/xgb_filter_m5.pkl" if cfg.TIMEFRAME == 300 else cfg.ML_MODEL_PATH
+                self.ml_filter = MLFilter(model_path, cfg.ML_THRESHOLD, fail_open=cfg.ML_FAIL_OPEN)
+        else:
+            self.ml_filter = None
         self.news_filter = NewsFilter()
 
 
