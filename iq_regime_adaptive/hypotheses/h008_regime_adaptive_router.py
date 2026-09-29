@@ -85,51 +85,34 @@ class H008RegimeAdaptiveRouter(BaseHypothesis):
         s5 = self.h5.generate_signals(df, payout=payout)
         s7 = self.h7.generate_signals(df, payout=payout)
 
-        # 3. Route according to regime
-        for i in range(len(df)):
-            reg = regime_series.iloc[i]
-
-            # Invariant: CHAOS is strictly NO_TRADE
-            if reg == MarketRegime.CHAOS.value:
-                signals.iloc[i] = MarketSignal.NO_TRADE.value
-                continue
-
-            routed_signal = MarketSignal.NO_TRADE.value
-
-            if reg == MarketRegime.RANGE.value:
-                # Route between H001 and H004
-                c1, c4 = s1.iloc[i], s4.iloc[i]
-                routed_signal = self._resolve_consensus(c1, c4)
-
-            elif reg == MarketRegime.TREND.value:
-                # Route between H002 and H005
-                c2, c5 = s2.iloc[i], s5.iloc[i]
-                routed_signal = self._resolve_consensus(c2, c5)
-
-            elif reg == MarketRegime.EXPANSION.value:
-                # Route between H003 and H007
-                c3, c7 = s3.iloc[i], s7.iloc[i]
-                routed_signal = self._resolve_consensus(c3, c7)
-
-            signals.iloc[i] = routed_signal
-
-        return signals
-
-    @staticmethod
-    def _resolve_consensus(sig_a: str, sig_b: str) -> str:
-        """Resolves consensus between two specialist models."""
+        # 3. Route according to regime (Vectorized)
+        
+        # Helper mappings
         call = MarketSignal.CALL.value
         put = MarketSignal.PUT.value
         no_trade = MarketSignal.NO_TRADE.value
 
-        # Conflicting signals -> Discard
-        if (sig_a == call and sig_b == put) or (sig_a == put and sig_b == call):
-            return no_trade
+        def resolve_vec(s_a, s_b):
+            cond_conflict = ((s_a == call) & (s_b == put)) | ((s_a == put) & (s_b == call))
+            cond_call = (s_a == call) | (s_b == call)
+            cond_put = (s_a == put) | (s_b == put)
+            return np.where(cond_conflict, no_trade, np.where(cond_call, call, np.where(cond_put, put, no_trade)))
 
-        # Agreement
-        if sig_a == call or sig_b == call:
-            return call
-        if sig_a == put or sig_b == put:
-            return put
+        routed_range = resolve_vec(s1, s4)
+        routed_trend = resolve_vec(s2, s5)
+        routed_exp = resolve_vec(s3, s7)
 
-        return no_trade
+        # Apply regimes
+        signals_arr = np.full(n, no_trade, dtype=object)
+        
+        is_range = (regime_series == MarketRegime.RANGE.value)
+        is_trend = (regime_series == MarketRegime.TREND.value)
+        is_exp = (regime_series == MarketRegime.EXPANSION.value)
+        
+        signals_arr = np.where(is_range, routed_range, signals_arr)
+        signals_arr = np.where(is_trend, routed_trend, signals_arr)
+        signals_arr = np.where(is_exp, routed_exp, signals_arr)
+        
+        signals[:] = signals_arr
+
+        return signals

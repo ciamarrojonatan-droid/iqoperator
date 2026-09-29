@@ -51,7 +51,7 @@ def normalize_timestamps(series: pd.Series) -> pd.Series:
             return pd.to_datetime(numeric_series, unit="s", utc=True)
     else:
         # Parse as ISO string / date formats
-        return pd.to_datetime(series, format="mixed", utc=True)
+        return pd.to_datetime(series, utc=True)
 
 
 def validate_ohlcv(df: pd.DataFrame, strict_volume: bool = False) -> pd.DataFrame:
