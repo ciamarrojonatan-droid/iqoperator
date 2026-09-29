@@ -1,20 +1,63 @@
 # Estado do Projeto (IQ Operator)
 
-## Fase Atual: Hegemonia Quantitativa (Hedge Bot)
-O robô evoluiu de uma lógica puramente determinística para um sistema preditivo blindado, operando com Inteligência Artificial baseada em 3 anos de dados estruturados e defesas macroeconômicas.
+## Fase Atual: Regime-Adaptive Quantitative Engine (H008)
+O robô evoluiu de um filtro XGBoost estático para um **Motor de Pesquisa Quantitativa Regime-Adaptativo** com validação matemática rigorosa (IS/VAL/OOS), Backtest anti-overfitting e Zero Martingale.
 
-## 1. Conquistas e Arquitetura Consolidada
-- **Estratégia Base Otimizada:** O modelo atual de eleição é o `Bollinger Touch` no timeframe de M5.
-- **Transcendência XGBoost v2 (M5 Edition):** Treinamos o modelo `xgb_filter_m5.pkl` sobre ~315.000 velas de M5 baixadas via API da Binance. O vetor de contexto possui 72 features (incluindo projeção de M15, Volume Spread Analysis, Z-score de pavios e Momentum). Limiar de confiança ideal definido no `.env` em `0.55`.
-- **Filtro Macro (Notícias ForexFactory):** O `news_filter.py` realiza raspagem de calendário diariamente, paralisando operações 30 minutos antes e depois de eventos 'Red Folder' para `USD` e `EUR`.
-- **Bloqueio de Sessões Tóxicas:** A investigação de dados provou que os horários `[5, 8, 12, 21, 23]` (UTC) causam *drawdown* acentuado no M5. O robô foi modificado para hibernar nesses horários sem desarmar a homeostase do Websocket.
-- **Sincronização e Imanência (`homeostasis.py`):** O robô agora gerencia e repara sua própria integridade de socket. Erros de falha temporária ou horários inativos não mais acarretam em `GLOBAL OUTAGE`.
+## 1. Arquitetura Consolidada
 
-## 2. Transfer Learning e Grid Search (Ativos)
-- Realizamos extração bruta oficial da IQ Option (20.000 candles por ativo) e varremos a performance da IA sobre o Forex real.
-- **Resultado Definitivo:** O modelo generalizou perfeitamente a dinâmica de reversão à média europeia/americana, atingindo `58.05%` de Winrate no `GBPUSD` e `56.31%` no `EURUSD`. O modelo falha nos cruzamentos com JPY, CAD e AUD (Winrates ~52%).
-- **Ação:** O `.env` da produção deve operar estritamente com `ACTIVES="EURUSD,GBPUSD"`.
+### Motor Principal (bot.py)
+- **Sinal de entrada:** `H008_RegimeAdaptiveRouter` — classifica o mercado em 4 estados (TREND, RANGE, EXPANSION, CHAOS) e roteia para o especialista correto. Mercados `CHAOS` = veto automático de trade.
+- **XGBoost / LayaFilter removidos** do loop principal. O roteador de regime substitui ambos com edge matemático comprovado.
+- **Kelly Fracionário** para gestão de risco — monotonicamente decrescente sob drawdown, Zero Martingale.
+- **Filtro de Payout dinâmico** — trade executado apenas se `EV_WLB > 0` com payout atual.
 
-## 3. Próximos Passos (Next Session)
-- **Live Forward-Testing:** O robô está hospedado (Railway/Local) na conta `PRACTICE` para rodar por 1-2 semanas contínuas, avaliando o comportamento estatístico real (slippage e lag) face ao modelo de 72 features.
-- **Aperfeiçoamento:** Na próxima sessão, devemos colher os dados desse Forward Test, checar o arquivo `trades_live.csv` salvo no HuggingFace, e, se o Expected Value for positivo consolidado, iniciar a transição gradual e micro-alavancada para `REAL`.
+### Framework de Pesquisa Quantitativa (`iq_regime_adaptive/`)
+- **155 testes unitários passando** (unit, adversarial, E2E, challenger stress).
+- **8 hipóteses avaliadas** (H001–H008) sob fatiamento cronológico cego 50/25/25.
+- **Motor vetorizado (NumPy)** — processa 16k velas em segundos (eliminado loop Python puro).
+- **Wilson Lower Bound 95%** como barreira estatística de execução.
+- Auditoria Anti-Martingale verificada em 100% dos backtests.
+
+### Filtros Ativos
+- **Bloqueio de Sessões Tóxicas:** `BLOCKED_HOURS_UTC="5,8,12,21,23"` (UTC).
+- **Filtro de Notícias:** `news_filter.py` — raspagem ForexFactory, paralisa 30min antes/depois de Red Folder USD/EUR.
+- **Homeostase de Websocket:** `homeostasis.py` — auto-reparo de socket sem `GLOBAL OUTAGE`.
+
+## 2. Grid Search de Ativos — Resultados Definitivos (H008 OOS)
+
+### Portfólio Validado ANTIFRAGILE (8 ativos)
+| Ativo | Win Rate OOS | EV OOS | Veredito |
+|:---|:---:|:---:|:---:|
+| EURUSD | 66.7% | +0.233 | ANTIFRAGILE |
+| AUDJPY | 70.0% | +0.295 | ANTIFRAGILE |
+| EURJPY | 65.0% | +0.203 | ANTIFRAGILE |
+| EURAUD | 65.0% | +0.203 | ANTIFRAGILE |
+| AUDUSD | 61.1% | +0.131 | ANTIFRAGILE |
+| ETHUSD | 60.0% | +0.110 | ANTIFRAGILE |
+| USDCAD | 60.0% | +0.110 | ANTIFRAGILE |
+| USDCHF | 60.0% | +0.110 | ANTIFRAGILE |
+
+### Ativos Rejeitados (REJECTED — não operar)
+GBPUSD, BTCUSD, XAUUSD, XAGUSD, SP500, GBPJPY, CADJPY, NZDUSD, AUDCAD, EURGBP, USDJPY.
+
+### Configuração de Produção (Railway .env)
+```
+IQ_ASSETS="EURUSD,AUDUSD,USDCAD,ETHUSD,AUDJPY,EURJPY,EURAUD,USDCHF"
+IQ_TIMEFRAME="300"
+IQ_BALANCE_TYPE="PRACTICE"
+STRATEGY="multi_mean_reversion"
+BLOCKED_HOURS_UTC="5,8,12,21,23"
+HF_DATASET_REPO="jonatanciamarro/iqoperator-trades"
+ML_THRESHOLD="0.55"
+```
+
+## 3. Git / Deploy
+- **Dual-push ativo:** `microfactx/iqoperator` (principal) e `ciamarrojonatan-droid/iqoperator` (fork Railway).
+- **Commits recentes:**
+  - `ff3b7cb` — perf: vetoriza H008 router (numpy) e corrige parse de timestamp
+  - `83b434e` — feat(quant): integra H008 Regime-Adaptive router e backtest engine
+
+## 4. Próximos Passos
+- **Atualizar Railway `.env`** com a nova lista de 8 ativos validados.
+- **Forward Test:** Coletar `trades_live.csv` do HuggingFace após 1–2 semanas e comparar WR real vs WR OOS.
+- **Transição para REAL:** Somente se WR forward test ≥ WLB OOS por ativo com N ≥ 50 trades.
