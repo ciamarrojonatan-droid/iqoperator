@@ -1,0 +1,130 @@
+{
+  "title": "Quantitative Verification & Research Report: Binary Options Regime-Adaptive Engine",
+  "generatedAt": "2026-09-29T03:42:24.974460+00:00",
+  "payoutTested": 0.1,
+  "breakevenHurdle": 0.90909,
+  "dataset": {
+    "path": "data\\EURUSD_M5_iq.csv",
+    "totalBars": 20000,
+    "span": {
+      "start": "2026-06-22 10:20:00+00:00",
+      "end": "2026-09-25 20:55:00+00:00"
+    },
+    "partitionRatios": {
+      "inSample": 0.5,
+      "validation": 0.25,
+      "outOfSample": 0.25
+    },
+    "warmupBars": 60
+  },
+  "governanceAttestation": {
+    "antiMartingaleAudit": "VERIFIED_ZERO_MARTINGALE",
+    "allocationCompliance": "FIXED_RISK_AND_STRICT_KELLY_COMPLIANT",
+    "zeroMartingaleConfirmed": true,
+    "lossResponseNonIncreasing": true,
+    "maxRiskCapEnforced": true,
+    "capitalKillSwitchActive": true,
+    "auditPassed": true,
+    "attestationStatement": "The backtest engine and execution models strictly forbid martingale, grid-averaging, and irrational asymmetric loss recovery multipliers. All stake allocations adhere to regularized fractional Kelly (gamma=0.25) and fixed fractional risk with non-increasing loss response and strict equity caps.",
+    "checkedTradesCount": 0,
+    "violationsDetected": []
+  },
+  "degradationMatrix": [
+    {
+      "hypothesisId": "H001",
+      "canonicalId": "H001_RANGE_MEAN_REVERSION",
+      "family": "STATISTICAL_MEAN_REVERSION",
+      "n_is": 0,
+      "wr_is": 0.0,
+      "ev_is": 0.0,
+      "n_oos": 0,
+      "wr_oos": 0.0,
+      "wlb_oos": 0.0,
+      "ev_oos": 0.0,
+      "delta_ev": 0.0,
+      "degradation_index": 0.0,
+      "stability_score": 70.0,
+      "verdict": "REJECTED",
+      "edgeStatus": "REJECTED"
+    }
+  ],
+  "hypotheses": {
+    "H001_RANGE_MEAN_REVERSION": {
+      "hypothesisId": "H001_RANGE_MEAN_REVERSION",
+      "shortId": "H001",
+      "family": "STATISTICAL_MEAN_REVERSION",
+      "name": "Range Mean Reversion",
+      "description": "Fades 2-sigma Bollinger band penetrations with RSI exhaustion in low-ADX range regimes.",
+      "payoutTested": 0.1,
+      "breakevenHurdle": 0.90909,
+      "partitions": {
+        "inSample": {
+          "trades": 0,
+          "effectiveTrades": 0.0,
+          "winRate": 0.0,
+          "wilsonLowerBound": 0.0,
+          "expectedValue": 0.0,
+          "evWlb": 0.0,
+          "totalPnl": 0.0,
+          "maxDrawdown": 0.0,
+          "profitFactor": 0.0,
+          "sharpeRatio": 0.0,
+          "sortinoRatio": 0.0
+        },
+        "outOfSample": {
+          "trades": 0,
+          "effectiveTrades": 0.0,
+          "winRate": 0.0,
+          "wilsonLowerBound": 0.0,
+          "expectedValue": 0.0,
+          "evWlb": 0.0,
+          "totalPnl": 0.0,
+          "maxDrawdown": 0.0,
+          "profitFactor": 0.0,
+          "sharpeRatio": 0.0,
+          "sortinoRatio": 0.0,
+          "monthlyConsistency": "0_TRADES"
+        },
+        "validation": {
+          "trades": 0,
+          "effectiveTrades": 0.0,
+          "winRate": 0.0,
+          "wilsonLowerBound": 0.0,
+          "expectedValue": 0.0,
+          "evWlb": 0.0,
+          "totalPnl": 0.0,
+          "maxDrawdown": 0.0,
+          "profitFactor": 0.0,
+          "sharpeRatio": 0.0,
+          "sortinoRatio": 0.0
+        }
+      },
+      "degradation": {
+        "deltaEV": 0.0,
+        "degradationIndex": 0.0,
+        "winRateDrop": 0.0,
+        "stabilityScore": 70.0,
+        "verdict": "REJECTED",
+        "subScores": {
+          "psiEV": 1.0,
+          "psiStat": 0.0,
+          "psiTime": 1.0,
+          "psiDD": 1.0
+        }
+      },
+      "governanceVerdict": {
+        "antiMartingaleAudit": "VERIFIED_ZERO_MARTINGALE",
+        "edgeStatus": "REJECTED"
+      }
+    }
+  },
+  "championHypothesis": {
+    "hypothesisId": "H001",
+    "canonicalId": "H001_RANGE_MEAN_REVERSION",
+    "stabilityScore": 70.0,
+    "outOfSampleWinRate": 0.0,
+    "outOfSampleEV": 0.0,
+    "verdict": "REJECTED",
+    "edgeStatus": "REJECTED"
+  }
+}

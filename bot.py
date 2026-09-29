@@ -93,15 +93,9 @@ class Bot:
         self._hard_reconnect_count = 0
         self._trade_log_init()
         self._load_pending()
-        if cfg.USE_ML_FILTER:
-            if getattr(cfg, "USE_LAYA_ORACLE", False):
-                from ml_filter import LayaFilter
-                self.ml_filter = LayaFilter(model_name=getattr(cfg, "LAYA_MODEL_NAME", "convaiinnovations/laya"), fail_open=cfg.ML_FAIL_OPEN)
-            else:
-                model_path = "models/xgb_filter_m5.pkl" if cfg.TIMEFRAME == 300 else cfg.ML_MODEL_PATH
-                self.ml_filter = MLFilter(model_path, cfg.ML_THRESHOLD, fail_open=cfg.ML_FAIL_OPEN)
-        else:
-            self.ml_filter = None
+        from iq_regime_adaptive.hypotheses.h008_regime_adaptive_router import H008RegimeAdaptiveRouter
+        self.regime_router = H008RegimeAdaptiveRouter()
+        self.ml_filter = None
         self.news_filter = NewsFilter()
 
 
@@ -826,48 +820,27 @@ class Bot:
                         if candle_key.startswith("noclock:"):
                             log.warning(f"{asset}: coluna de tempo ausente nos candles â€” avaliando sem dedup por candle.")
 
-                        df_h1 = None
-                        if cfg.STRATEGY == "rsi_mtf_pullback":
-                            df_h1 = self.candles_df(asset, cfg.HTF_TIMEFRAME, cfg.HTF_COUNT)
-                            if df_h1 is None or df_h1.empty:
-                                continue
-
-                        signal = get_signal(cfg.STRATEGY, df, cfg, df_h1)
+                        # H008 Regime-Adaptive Router
+                        signal_series = self.regime_router.generate_signals(df, payout=payout)
+                        raw_signal = signal_series.iloc[-1]
+                        signal = raw_signal.lower() if raw_signal != "NO_TRADE" else None
+                        
                         self.last_signal[asset] = signal
                         close_px = float(df["close"].iloc[-1])
-                        if cfg.STRATEGY == "donchian_fade":
-                            info: object = f"DC{cfg.DONCHIAN_N}"
-                            n = cfg.DONCHIAN_N
-                            hi = float(df["high"].iloc[-n - 1:-1].max())
-                            lo = float(df["low"].iloc[-n - 1:-1].min())
-                            detail_s = f"close={close_px:.2f} hi20={hi:.2f} lo20={lo:.2f}"
-                        elif cfg.STRATEGY == "bollinger_touch":
-                            info = f"BB{cfg.BB_PERIOD}"
-                            detail_s = f"close={close_px:.2f} BB({cfg.BB_PERIOD},{cfg.BB_MULT})"
-                        elif cfg.STRATEGY == "multi_mean_reversion":
-                            info = "MULTI"
-                            rsi_val = round(float(rsi_series(df["close"], cfg.RSI_PERIOD).iloc[-1]), 1)
-                            detail_s = f"close={close_px:.2f} RSI={rsi_val} MULTI"
-                        else:
-                            info = round(float(rsi_series(df["close"], cfg.RSI_PERIOD).iloc[-1]), 1)
-                            detail_s = f"close={close_px:.2f} RSI={info}"
+                        
+                        info = "H008_ROUTER"
+                        detail_s = f"close={close_px:.2f} H008"
+                        
                         self.last_payout[asset] = payout
                         self.last_check[asset] = f"{detail_s} signal={signal} payout={payout:.2f}"
                         log.info(f"[CHECK] {asset} {candle_key} {detail_s} -> {signal} (payout {payout:.2f})")
                         self._write_status()
+                        
                         if not signal:
                             continue
                         if len(self.pending) >= cfg.MAX_CONCURRENT:
                             log.info(f"SINAL {signal.upper()} {asset} ignorado: cap {cfg.MAX_CONCURRENT} pendentes atingido.")
                             continue
-
-                        # Filtro Preditivo ML (XGBoost tau=0.62)
-                        if self.ml_filter:
-                            allowed, prob = self.ml_filter.filter_signal(df, signal, threshold=cfg.ML_THRESHOLD)
-                            if not allowed:
-                                log.info(f"[ML FILTER] False Breakout detectado, trade cancelado ({asset} {signal.upper()}, prob={prob:.4f} < {cfg.ML_THRESHOLD})")
-                                continue
-                            log.info(f"[ML FILTER] Trade aprovado ({asset} {signal.upper()}, prob={prob:.4f} >= {cfg.ML_THRESHOLD})")
 
                         stake, p, kfull = self.calc_stake(asset, payout)
 

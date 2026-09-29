@@ -1,0 +1,35 @@
+{
+  "title": "Quantitative Verification & Research Report: Binary Options Regime-Adaptive Engine",
+  "generatedAt": "2026-09-29T03:42:11.241824+00:00",
+  "payoutTested": 0.85,
+  "breakevenHurdle": 0.54054,
+  "dataset": {
+    "path": "data\\EURUSD_M5_iq.csv",
+    "totalBars": 20000,
+    "span": {
+      "start": "2026-06-22 10:20:00+00:00",
+      "end": "2026-09-25 20:55:00+00:00"
+    },
+    "partitionRatios": {
+      "inSample": 0.5,
+      "validation": 0.25,
+      "outOfSample": 0.25
+    },
+    "warmupBars": 60
+  },
+  "governanceAttestation": {
+    "antiMartingaleAudit": "VERIFIED_ZERO_MARTINGALE",
+    "allocationCompliance": "FIXED_RISK_AND_STRICT_KELLY_COMPLIANT",
+    "zeroMartingaleConfirmed": true,
+    "lossResponseNonIncreasing": true,
+    "maxRiskCapEnforced": true,
+    "capitalKillSwitchActive": true,
+    "auditPassed": true,
+    "attestationStatement": "The backtest engine and execution models strictly forbid martingale, grid-averaging, and irrational asymmetric loss recovery multipliers. All stake allocations adhere to regularized fractional Kelly (gamma=0.25) and fixed fractional risk with non-increasing loss response and strict equity caps.",
+    "checkedTradesCount": 0,
+    "violationsDetected": []
+  },
+  "degradationMatrix": [],
+  "hypotheses": {},
+  "championHypothesis": null
+}

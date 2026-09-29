@@ -1,0 +1,130 @@
+{
+  "title": "Quantitative Verification & Research Report: Binary Options Regime-Adaptive Engine",
+  "generatedAt": "2026-09-29T03:43:39.019202+00:00",
+  "payoutTested": 0.85,
+  "breakevenHurdle": 0.54054,
+  "dataset": {
+    "path": "data\\EURUSD_M5_iq.csv",
+    "totalBars": 20000,
+    "span": {
+      "start": "2026-06-22 10:20:00+00:00",
+      "end": "2026-09-25 20:55:00+00:00"
+    },
+    "partitionRatios": {
+      "inSample": 0.6,
+      "validation": 0.2,
+      "outOfSample": 0.2
+    },
+    "warmupBars": 60
+  },
+  "governanceAttestation": {
+    "antiMartingaleAudit": "VERIFIED_ZERO_MARTINGALE",
+    "allocationCompliance": "FIXED_RISK_AND_STRICT_KELLY_COMPLIANT",
+    "zeroMartingaleConfirmed": true,
+    "lossResponseNonIncreasing": true,
+    "maxRiskCapEnforced": true,
+    "capitalKillSwitchActive": true,
+    "auditPassed": true,
+    "attestationStatement": "The backtest engine and execution models strictly forbid martingale, grid-averaging, and irrational asymmetric loss recovery multipliers. All stake allocations adhere to regularized fractional Kelly (gamma=0.25) and fixed fractional risk with non-increasing loss response and strict equity caps.",
+    "checkedTradesCount": 46,
+    "violationsDetected": []
+  },
+  "degradationMatrix": [
+    {
+      "hypothesisId": "H001",
+      "canonicalId": "H001_RANGE_MEAN_REVERSION",
+      "family": "STATISTICAL_MEAN_REVERSION",
+      "n_is": 21,
+      "wr_is": 0.5,
+      "ev_is": -0.075,
+      "n_oos": 11,
+      "wr_oos": 0.4545,
+      "wlb_oos": 0.2127,
+      "ev_oos": -0.1591,
+      "delta_ev": 0.0841,
+      "degradation_index": 1.1212,
+      "stability_score": 35.0,
+      "verdict": "REJECTED",
+      "edgeStatus": "REJECTED"
+    }
+  ],
+  "hypotheses": {
+    "H001_RANGE_MEAN_REVERSION": {
+      "hypothesisId": "H001_RANGE_MEAN_REVERSION",
+      "shortId": "H001",
+      "family": "STATISTICAL_MEAN_REVERSION",
+      "name": "Range Mean Reversion",
+      "description": "Fades 2-sigma Bollinger band penetrations with RSI exhaustion in low-ADX range regimes.",
+      "payoutTested": 0.85,
+      "breakevenHurdle": 0.54054,
+      "partitions": {
+        "inSample": {
+          "trades": 21,
+          "effectiveTrades": 15.2,
+          "winRate": 0.5,
+          "wilsonLowerBound": 0.2993,
+          "expectedValue": -0.075,
+          "evWlb": -0.4463,
+          "totalPnl": -10.11,
+          "maxDrawdown": 0.0415,
+          "profitFactor": 0.85,
+          "sharpeRatio": -0.37,
+          "sortinoRatio": -30.27
+        },
+        "outOfSample": {
+          "trades": 11,
+          "effectiveTrades": 11.0,
+          "winRate": 0.4545,
+          "wilsonLowerBound": 0.2127,
+          "expectedValue": -0.1591,
+          "evWlb": -0.6065,
+          "totalPnl": -11.57,
+          "maxDrawdown": 0.0224,
+          "profitFactor": 0.7,
+          "sharpeRatio": -0.58,
+          "sortinoRatio": -84.03,
+          "monthlyConsistency": "N/A"
+        },
+        "validation": {
+          "trades": 14,
+          "effectiveTrades": 13.2,
+          "winRate": 0.5714,
+          "wilsonLowerBound": 0.3259,
+          "expectedValue": 0.0571,
+          "evWlb": -0.3971,
+          "totalPnl": 4.98,
+          "maxDrawdown": 0.0195,
+          "profitFactor": 1.13,
+          "sharpeRatio": 0.22,
+          "sortinoRatio": 37.03
+        }
+      },
+      "degradation": {
+        "deltaEV": 0.0841,
+        "degradationIndex": 1.1212,
+        "winRateDrop": 0.0455,
+        "stabilityScore": 35.0,
+        "verdict": "REJECTED",
+        "subScores": {
+          "psiEV": 0.0,
+          "psiStat": 0.0,
+          "psiTime": 1.0,
+          "psiDD": 1.0
+        }
+      },
+      "governanceVerdict": {
+        "antiMartingaleAudit": "VERIFIED_ZERO_MARTINGALE",
+        "edgeStatus": "REJECTED"
+      }
+    }
+  },
+  "championHypothesis": {
+    "hypothesisId": "H001",
+    "canonicalId": "H001_RANGE_MEAN_REVERSION",
+    "stabilityScore": 35.0,
+    "outOfSampleWinRate": 0.4545,
+    "outOfSampleEV": -0.1591,
+    "verdict": "REJECTED",
+    "edgeStatus": "REJECTED"
+  }
+}

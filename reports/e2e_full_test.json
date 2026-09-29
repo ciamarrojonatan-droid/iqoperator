@@ -1,0 +1,725 @@
+{
+  "title": "Quantitative Verification & Research Report: Binary Options Regime-Adaptive Engine",
+  "generatedAt": "2026-09-29T03:47:48.268917+00:00",
+  "payoutTested": 0.85,
+  "breakevenHurdle": 0.54054,
+  "dataset": {
+    "path": "data\\EURUSD_M5_iq.csv",
+    "totalBars": 20000,
+    "span": {
+      "start": "2026-06-22 10:20:00+00:00",
+      "end": "2026-09-25 20:55:00+00:00"
+    },
+    "partitionRatios": {
+      "inSample": 0.5,
+      "validation": 0.25,
+      "outOfSample": 0.25
+    },
+    "warmupBars": 60
+  },
+  "governanceAttestation": {
+    "antiMartingaleAudit": "VERIFIED_ZERO_MARTINGALE",
+    "allocationCompliance": "FIXED_RISK_AND_STRICT_KELLY_COMPLIANT",
+    "zeroMartingaleConfirmed": true,
+    "lossResponseNonIncreasing": true,
+    "maxRiskCapEnforced": true,
+    "capitalKillSwitchActive": true,
+    "auditPassed": true,
+    "attestationStatement": "The backtest engine and execution models strictly forbid martingale, grid-averaging, and irrational asymmetric loss recovery multipliers. All stake allocations adhere to regularized fractional Kelly (gamma=0.25) and fixed fractional risk with non-increasing loss response and strict equity caps.",
+    "checkedTradesCount": 458,
+    "violationsDetected": []
+  },
+  "degradationMatrix": [
+    {
+      "hypothesisId": "H001",
+      "canonicalId": "H001_RANGE_MEAN_REVERSION",
+      "family": "STATISTICAL_MEAN_REVERSION",
+      "n_is": 21,
+      "wr_is": 0.5,
+      "ev_is": -0.075,
+      "n_oos": 13,
+      "wr_oos": 0.4615,
+      "wlb_oos": 0.2321,
+      "ev_oos": -0.1462,
+      "delta_ev": 0.0712,
+      "degradation_index": 0.9487,
+      "stability_score": 35.0,
+      "verdict": "REJECTED",
+      "edgeStatus": "REJECTED"
+    },
+    {
+      "hypothesisId": "H002",
+      "canonicalId": "H002_TREND_PULLBACK",
+      "family": "TREND_CONTINUATION",
+      "n_is": 20,
+      "wr_is": 0.55,
+      "ev_is": 0.0175,
+      "n_oos": 20,
+      "wr_oos": 0.3,
+      "wlb_oos": 0.1455,
+      "ev_oos": -0.445,
+      "delta_ev": 0.4625,
+      "degradation_index": 26.4286,
+      "stability_score": 24.8,
+      "verdict": "REJECTED",
+      "edgeStatus": "REJECTED"
+    },
+    {
+      "hypothesisId": "H003",
+      "canonicalId": "H003_VOLATILITY_EXPANSION_BREAKOUT",
+      "family": "MOMENTUM_BREAKOUT",
+      "n_is": 20,
+      "wr_is": 0.5,
+      "ev_is": -0.075,
+      "n_oos": 20,
+      "wr_oos": 0.3,
+      "wlb_oos": 0.1455,
+      "ev_oos": -0.445,
+      "delta_ev": 0.37,
+      "degradation_index": 4.9333,
+      "stability_score": 24.1,
+      "verdict": "REJECTED",
+      "edgeStatus": "REJECTED"
+    },
+    {
+      "hypothesisId": "H004",
+      "canonicalId": "H004_AUTOCORRELATION_MEAN_REVERSION",
+      "family": "STATISTICAL_MICROSTRUCTURE",
+      "n_is": 20,
+      "wr_is": 0.55,
+      "ev_is": 0.0175,
+      "n_oos": 21,
+      "wr_oos": 0.65,
+      "wlb_oos": 0.4329,
+      "ev_oos": 0.2025,
+      "delta_ev": -0.185,
+      "degradation_index": -10.5714,
+      "stability_score": 70.0,
+      "verdict": "ANTIFRAGILE",
+      "edgeStatus": "CONDITIONAL"
+    },
+    {
+      "hypothesisId": "H005",
+      "canonicalId": "H005_MTF_TREND_ALIGNMENT",
+      "family": "HIERARCHICAL_MULTISCALE",
+      "n_is": 20,
+      "wr_is": 0.6,
+      "ev_is": 0.11,
+      "n_oos": 10,
+      "wr_oos": 0.5,
+      "wlb_oos": 0.2366,
+      "ev_oos": -0.075,
+      "delta_ev": 0.185,
+      "degradation_index": 1.6818,
+      "stability_score": 35.0,
+      "verdict": "REJECTED",
+      "edgeStatus": "REJECTED"
+    },
+    {
+      "hypothesisId": "H006",
+      "canonicalId": "H006_PAYOUT_FILTERED_DYNAMIC_EDGE",
+      "family": "PAYOUT_EV_OPTIMIZATION",
+      "n_is": 20,
+      "wr_is": 0.6,
+      "ev_is": 0.11,
+      "n_oos": 20,
+      "wr_oos": 0.4,
+      "wlb_oos": 0.2188,
+      "ev_oos": -0.26,
+      "delta_ev": 0.37,
+      "degradation_index": 3.3636,
+      "stability_score": 29.7,
+      "verdict": "REJECTED",
+      "edgeStatus": "REJECTED"
+    },
+    {
+      "hypothesisId": "H007",
+      "canonicalId": "H007_VOLATILITY_CONTRACTION_SQUEEZE",
+      "family": "REGIME_TRANSITION_EDGE",
+      "n_is": 20,
+      "wr_is": 0.45,
+      "ev_is": -0.1675,
+      "n_oos": 20,
+      "wr_oos": 0.55,
+      "wlb_oos": 0.3421,
+      "ev_oos": 0.0175,
+      "delta_ev": -0.185,
+      "degradation_index": -1.1045,
+      "stability_score": 70.0,
+      "verdict": "ANTIFRAGILE",
+      "edgeStatus": "CONDITIONAL"
+    },
+    {
+      "hypothesisId": "H008",
+      "canonicalId": "H008_REGIME_ADAPTIVE_ENSEMBLE_ROUTER",
+      "family": "META_ENSEMBLE_ROUTER",
+      "n_is": 20,
+      "wr_is": 0.5,
+      "ev_is": -0.075,
+      "n_oos": 19,
+      "wr_oos": 0.6667,
+      "wlb_oos": 0.4375,
+      "ev_oos": 0.2333,
+      "delta_ev": -0.3083,
+      "degradation_index": -4.1111,
+      "stability_score": 70.0,
+      "verdict": "ANTIFRAGILE",
+      "edgeStatus": "CONDITIONAL"
+    }
+  ],
+  "hypotheses": {
+    "H001_RANGE_MEAN_REVERSION": {
+      "hypothesisId": "H001_RANGE_MEAN_REVERSION",
+      "shortId": "H001",
+      "family": "STATISTICAL_MEAN_REVERSION",
+      "name": "Range Mean Reversion",
+      "description": "Fades 2-sigma Bollinger band penetrations with RSI exhaustion in low-ADX range regimes.",
+      "payoutTested": 0.85,
+      "breakevenHurdle": 0.54054,
+      "partitions": {
+        "inSample": {
+          "trades": 21,
+          "effectiveTrades": 15.2,
+          "winRate": 0.5,
+          "wilsonLowerBound": 0.2993,
+          "expectedValue": -0.075,
+          "evWlb": -0.4463,
+          "totalPnl": -10.11,
+          "maxDrawdown": 0.0415,
+          "profitFactor": 0.85,
+          "sharpeRatio": -0.37,
+          "sortinoRatio": -30.27
+        },
+        "outOfSample": {
+          "trades": 13,
+          "effectiveTrades": 13.0,
+          "winRate": 0.4615,
+          "wilsonLowerBound": 0.2321,
+          "expectedValue": -0.1462,
+          "evWlb": -0.5707,
+          "totalPnl": -12.57,
+          "maxDrawdown": 0.0234,
+          "profitFactor": 0.72,
+          "sharpeRatio": -0.58,
+          "sortinoRatio": -81.62,
+          "monthlyConsistency": "N/A"
+        },
+        "validation": {
+          "trades": 21,
+          "effectiveTrades": 20.0,
+          "winRate": 0.6,
+          "wilsonLowerBound": 0.3866,
+          "expectedValue": 0.11,
+          "evWlb": -0.2848,
+          "totalPnl": 14.13,
+          "maxDrawdown": 0.0195,
+          "profitFactor": 1.27,
+          "sharpeRatio": 0.53,
+          "sortinoRatio": 62.37
+        }
+      },
+      "degradation": {
+        "deltaEV": 0.0712,
+        "degradationIndex": 0.9487,
+        "winRateDrop": 0.0385,
+        "stabilityScore": 35.0,
+        "verdict": "REJECTED",
+        "subScores": {
+          "psiEV": 0.0,
+          "psiStat": 0.0,
+          "psiTime": 1.0,
+          "psiDD": 1.0
+        }
+      },
+      "governanceVerdict": {
+        "antiMartingaleAudit": "VERIFIED_ZERO_MARTINGALE",
+        "edgeStatus": "REJECTED"
+      }
+    },
+    "H002_TREND_PULLBACK": {
+      "hypothesisId": "H002_TREND_PULLBACK",
+      "shortId": "H002",
+      "family": "TREND_CONTINUATION",
+      "name": "Trend Pullback",
+      "description": "Exploits directional continuation from dynamic EMA equilibrium pullbacks in trending regimes.",
+      "payoutTested": 0.85,
+      "breakevenHurdle": 0.54054,
+      "partitions": {
+        "inSample": {
+          "trades": 20,
+          "effectiveTrades": 10.5,
+          "winRate": 0.55,
+          "wilsonLowerBound": 0.3421,
+          "expectedValue": 0.0175,
+          "evWlb": -0.3671,
+          "totalPnl": 1.93,
+          "maxDrawdown": 0.0332,
+          "profitFactor": 1.03,
+          "sharpeRatio": 0.07,
+          "sortinoRatio": 6.87
+        },
+        "outOfSample": {
+          "trades": 20,
+          "effectiveTrades": 16.6,
+          "winRate": 0.3,
+          "wilsonLowerBound": 0.1455,
+          "expectedValue": -0.445,
+          "evWlb": -0.7309,
+          "totalPnl": -56.82,
+          "maxDrawdown": 0.0672,
+          "profitFactor": 0.36,
+          "sharpeRatio": -2.37,
+          "sortinoRatio": -100.95,
+          "monthlyConsistency": "N/A"
+        },
+        "validation": {
+          "trades": 21,
+          "effectiveTrades": 7.8,
+          "winRate": 0.65,
+          "wilsonLowerBound": 0.4329,
+          "expectedValue": 0.2025,
+          "evWlb": -0.1992,
+          "totalPnl": 26.46,
+          "maxDrawdown": 0.0332,
+          "profitFactor": 1.57,
+          "sharpeRatio": 1.01,
+          "sortinoRatio": 88.53
+        }
+      },
+      "degradation": {
+        "deltaEV": 0.4625,
+        "degradationIndex": 26.4286,
+        "winRateDrop": 0.25,
+        "stabilityScore": 24.8,
+        "verdict": "REJECTED",
+        "subScores": {
+          "psiEV": 0.0,
+          "psiStat": 0.0,
+          "psiTime": 1.0,
+          "psiDD": 0.32
+        }
+      },
+      "governanceVerdict": {
+        "antiMartingaleAudit": "VERIFIED_ZERO_MARTINGALE",
+        "edgeStatus": "REJECTED"
+      }
+    },
+    "H003_VOLATILITY_EXPANSION_BREAKOUT": {
+      "hypothesisId": "H003_VOLATILITY_EXPANSION_BREAKOUT",
+      "shortId": "H003",
+      "family": "MOMENTUM_BREAKOUT",
+      "name": "Volatility Expansion Breakout",
+      "description": "Captures directional momentum surges during sudden volatility and bandwidth expansion.",
+      "payoutTested": 0.85,
+      "breakevenHurdle": 0.54054,
+      "partitions": {
+        "inSample": {
+          "trades": 20,
+          "effectiveTrades": 17.9,
+          "winRate": 0.5,
+          "wilsonLowerBound": 0.2993,
+          "expectedValue": -0.075,
+          "evWlb": -0.4463,
+          "totalPnl": -10.11,
+          "maxDrawdown": 0.0205,
+          "profitFactor": 0.85,
+          "sharpeRatio": -0.38,
+          "sortinoRatio": -70.21
+        },
+        "outOfSample": {
+          "trades": 20,
+          "effectiveTrades": 12.8,
+          "winRate": 0.3,
+          "wilsonLowerBound": 0.1455,
+          "expectedValue": -0.445,
+          "evWlb": -0.7309,
+          "totalPnl": -56.86,
+          "maxDrawdown": 0.0569,
+          "profitFactor": 0.36,
+          "sharpeRatio": -2.37,
+          "sortinoRatio": -128.52,
+          "monthlyConsistency": "N/A"
+        },
+        "validation": {
+          "trades": 20,
+          "effectiveTrades": 16.6,
+          "winRate": 0.3,
+          "wilsonLowerBound": 0.1455,
+          "expectedValue": -0.445,
+          "evWlb": -0.7309,
+          "totalPnl": -56.82,
+          "maxDrawdown": 0.0653,
+          "profitFactor": 0.36,
+          "sharpeRatio": -2.36,
+          "sortinoRatio": -101.46
+        }
+      },
+      "degradation": {
+        "deltaEV": 0.37,
+        "degradationIndex": 4.9333,
+        "winRateDrop": 0.2,
+        "stabilityScore": 24.1,
+        "verdict": "REJECTED",
+        "subScores": {
+          "psiEV": 0.0,
+          "psiStat": 0.0,
+          "psiTime": 1.0,
+          "psiDD": 0.272
+        }
+      },
+      "governanceVerdict": {
+        "antiMartingaleAudit": "VERIFIED_ZERO_MARTINGALE",
+        "edgeStatus": "REJECTED"
+      }
+    },
+    "H004_AUTOCORRELATION_MEAN_REVERSION": {
+      "hypothesisId": "H004_AUTOCORRELATION_MEAN_REVERSION",
+      "shortId": "H004",
+      "family": "STATISTICAL_MICROSTRUCTURE",
+      "name": "Autocorrelation Mean Reversion",
+      "description": "Exploits negative return autocorrelation for statistical reversal on extreme excursions.",
+      "payoutTested": 0.85,
+      "breakevenHurdle": 0.54054,
+      "partitions": {
+        "inSample": {
+          "trades": 20,
+          "effectiveTrades": 18.7,
+          "winRate": 0.55,
+          "wilsonLowerBound": 0.3421,
+          "expectedValue": 0.0175,
+          "evWlb": -0.3671,
+          "totalPnl": 1.91,
+          "maxDrawdown": 0.017,
+          "profitFactor": 1.03,
+          "sharpeRatio": 0.07,
+          "sortinoRatio": 10.33
+        },
+        "outOfSample": {
+          "trades": 21,
+          "effectiveTrades": 12.2,
+          "winRate": 0.65,
+          "wilsonLowerBound": 0.4329,
+          "expectedValue": 0.2025,
+          "evWlb": -0.1992,
+          "totalPnl": 26.47,
+          "maxDrawdown": 0.014,
+          "profitFactor": 1.57,
+          "sharpeRatio": 1.01,
+          "sortinoRatio": 83.64,
+          "monthlyConsistency": "N/A"
+        },
+        "validation": {
+          "trades": 20,
+          "effectiveTrades": 14.2,
+          "winRate": 0.55,
+          "wilsonLowerBound": 0.3421,
+          "expectedValue": 0.0175,
+          "evWlb": -0.3671,
+          "totalPnl": 1.94,
+          "maxDrawdown": 0.0298,
+          "profitFactor": 1.03,
+          "sharpeRatio": 0.07,
+          "sortinoRatio": 7.81
+        }
+      },
+      "degradation": {
+        "deltaEV": -0.185,
+        "degradationIndex": -10.5714,
+        "winRateDrop": -0.1,
+        "stabilityScore": 70.0,
+        "verdict": "ANTIFRAGILE",
+        "subScores": {
+          "psiEV": 1.0,
+          "psiStat": 0.0,
+          "psiTime": 1.0,
+          "psiDD": 1.0
+        }
+      },
+      "governanceVerdict": {
+        "antiMartingaleAudit": "VERIFIED_ZERO_MARTINGALE",
+        "edgeStatus": "CONDITIONAL"
+      }
+    },
+    "H005_MTF_TREND_ALIGNMENT": {
+      "hypothesisId": "H005_MTF_TREND_ALIGNMENT",
+      "shortId": "H005",
+      "family": "HIERARCHICAL_MULTISCALE",
+      "name": "Multi-Timeframe Trend Alignment",
+      "description": "Filters micro pullbacks through a strictly causal macro trend alignment envelope.",
+      "payoutTested": 0.85,
+      "breakevenHurdle": 0.54054,
+      "partitions": {
+        "inSample": {
+          "trades": 20,
+          "effectiveTrades": 11.6,
+          "winRate": 0.6,
+          "wilsonLowerBound": 0.3866,
+          "expectedValue": 0.11,
+          "evWlb": -0.2848,
+          "totalPnl": 14.11,
+          "maxDrawdown": 0.0322,
+          "profitFactor": 1.27,
+          "sharpeRatio": 0.53,
+          "sortinoRatio": 60.86
+        },
+        "outOfSample": {
+          "trades": 10,
+          "effectiveTrades": 6.6,
+          "winRate": 0.5,
+          "wilsonLowerBound": 0.2366,
+          "expectedValue": -0.075,
+          "evWlb": -0.5623,
+          "totalPnl": -5.06,
+          "maxDrawdown": 0.0205,
+          "profitFactor": 0.85,
+          "sharpeRatio": -0.26,
+          "sortinoRatio": -44.29,
+          "monthlyConsistency": "N/A"
+        },
+        "validation": {
+          "trades": 10,
+          "effectiveTrades": 10.0,
+          "winRate": 0.2,
+          "wilsonLowerBound": 0.0567,
+          "expectedValue": -0.63,
+          "evWlb": -0.8951,
+          "totalPnl": -40.5,
+          "maxDrawdown": 0.0405,
+          "profitFactor": 0.21,
+          "sharpeRatio": -2.7,
+          "sortinoRatio": -183.0
+        }
+      },
+      "degradation": {
+        "deltaEV": 0.185,
+        "degradationIndex": 1.6818,
+        "winRateDrop": 0.1,
+        "stabilityScore": 35.0,
+        "verdict": "REJECTED",
+        "subScores": {
+          "psiEV": 0.0,
+          "psiStat": 0.0,
+          "psiTime": 1.0,
+          "psiDD": 1.0
+        }
+      },
+      "governanceVerdict": {
+        "antiMartingaleAudit": "VERIFIED_ZERO_MARTINGALE",
+        "edgeStatus": "REJECTED"
+      }
+    },
+    "H006_PAYOUT_FILTERED_DYNAMIC_EDGE": {
+      "hypothesisId": "H006_PAYOUT_FILTERED_DYNAMIC_EDGE",
+      "shortId": "H006",
+      "family": "PAYOUT_EV_OPTIMIZATION",
+      "name": "Payout Filtered Dynamic Edge",
+      "description": "Strictly gates execution by minimum payout (>=0.80) and EV_WLB mathematical expectation.",
+      "payoutTested": 0.85,
+      "breakevenHurdle": 0.54054,
+      "partitions": {
+        "inSample": {
+          "trades": 20,
+          "effectiveTrades": 14.8,
+          "winRate": 0.6,
+          "wilsonLowerBound": 0.3866,
+          "expectedValue": 0.11,
+          "evWlb": -0.2848,
+          "totalPnl": 14.13,
+          "maxDrawdown": 0.0259,
+          "profitFactor": 1.26,
+          "sharpeRatio": 0.52,
+          "sortinoRatio": 81.6
+        },
+        "outOfSample": {
+          "trades": 20,
+          "effectiveTrades": 15.6,
+          "winRate": 0.4,
+          "wilsonLowerBound": 0.2188,
+          "expectedValue": -0.26,
+          "evWlb": -0.5952,
+          "totalPnl": -33.78,
+          "maxDrawdown": 0.0434,
+          "profitFactor": 0.56,
+          "sharpeRatio": -1.31,
+          "sortinoRatio": -109.91,
+          "monthlyConsistency": "N/A"
+        },
+        "validation": {
+          "trades": 20,
+          "effectiveTrades": 18.1,
+          "winRate": 0.5,
+          "wilsonLowerBound": 0.2993,
+          "expectedValue": -0.075,
+          "evWlb": -0.4463,
+          "totalPnl": -10.11,
+          "maxDrawdown": 0.0234,
+          "profitFactor": 0.85,
+          "sharpeRatio": -0.37,
+          "sortinoRatio": -68.1
+        }
+      },
+      "degradation": {
+        "deltaEV": 0.37,
+        "degradationIndex": 3.3636,
+        "winRateDrop": 0.2,
+        "stabilityScore": 29.7,
+        "verdict": "REJECTED",
+        "subScores": {
+          "psiEV": 0.0,
+          "psiStat": 0.0,
+          "psiTime": 1.0,
+          "psiDD": 0.648
+        }
+      },
+      "governanceVerdict": {
+        "antiMartingaleAudit": "VERIFIED_ZERO_MARTINGALE",
+        "edgeStatus": "REJECTED"
+      }
+    },
+    "H007_VOLATILITY_CONTRACTION_SQUEEZE": {
+      "hypothesisId": "H007_VOLATILITY_CONTRACTION_SQUEEZE",
+      "shortId": "H007",
+      "family": "REGIME_TRANSITION_EDGE",
+      "name": "Volatility Contraction Squeeze Breakout",
+      "description": "Trades directional impulse upon release of Bollinger-Keltner compression squeeze.",
+      "payoutTested": 0.85,
+      "breakevenHurdle": 0.54054,
+      "partitions": {
+        "inSample": {
+          "trades": 20,
+          "effectiveTrades": 12.8,
+          "winRate": 0.45,
+          "wilsonLowerBound": 0.2582,
+          "expectedValue": -0.1675,
+          "evWlb": -0.5223,
+          "totalPnl": -22.0,
+          "maxDrawdown": 0.0332,
+          "profitFactor": 0.69,
+          "sharpeRatio": -0.82,
+          "sortinoRatio": -100.43
+        },
+        "outOfSample": {
+          "trades": 20,
+          "effectiveTrades": 18.5,
+          "winRate": 0.55,
+          "wilsonLowerBound": 0.3421,
+          "expectedValue": 0.0175,
+          "evWlb": -0.3671,
+          "totalPnl": 1.92,
+          "maxDrawdown": 0.0205,
+          "profitFactor": 1.03,
+          "sharpeRatio": 0.07,
+          "sortinoRatio": 11.21,
+          "monthlyConsistency": "N/A"
+        },
+        "validation": {
+          "trades": 20,
+          "effectiveTrades": 14.5,
+          "winRate": 0.55,
+          "wilsonLowerBound": 0.3421,
+          "expectedValue": 0.0175,
+          "evWlb": -0.3671,
+          "totalPnl": 1.94,
+          "maxDrawdown": 0.0308,
+          "profitFactor": 1.03,
+          "sharpeRatio": 0.07,
+          "sortinoRatio": 7.61
+        }
+      },
+      "degradation": {
+        "deltaEV": -0.185,
+        "degradationIndex": -1.1045,
+        "winRateDrop": -0.1,
+        "stabilityScore": 70.0,
+        "verdict": "ANTIFRAGILE",
+        "subScores": {
+          "psiEV": 1.0,
+          "psiStat": 0.0,
+          "psiTime": 1.0,
+          "psiDD": 1.0
+        }
+      },
+      "governanceVerdict": {
+        "antiMartingaleAudit": "VERIFIED_ZERO_MARTINGALE",
+        "edgeStatus": "CONDITIONAL"
+      }
+    },
+    "H008_REGIME_ADAPTIVE_ENSEMBLE_ROUTER": {
+      "hypothesisId": "H008_REGIME_ADAPTIVE_ENSEMBLE_ROUTER",
+      "shortId": "H008",
+      "family": "META_ENSEMBLE_ROUTER",
+      "name": "Regime-Adaptive Meta-Router",
+      "description": "Dynamically routes signals across regimes with strict Chaos veto.",
+      "payoutTested": 0.85,
+      "breakevenHurdle": 0.54054,
+      "partitions": {
+        "inSample": {
+          "trades": 20,
+          "effectiveTrades": 20.0,
+          "winRate": 0.5,
+          "wilsonLowerBound": 0.2993,
+          "expectedValue": -0.075,
+          "evWlb": -0.4463,
+          "totalPnl": -10.13,
+          "maxDrawdown": 0.0244,
+          "profitFactor": 0.85,
+          "sharpeRatio": -0.37,
+          "sortinoRatio": -73.08
+        },
+        "outOfSample": {
+          "trades": 19,
+          "effectiveTrades": 10.0,
+          "winRate": 0.6667,
+          "wilsonLowerBound": 0.4375,
+          "expectedValue": 0.2333,
+          "evWlb": -0.1906,
+          "totalPnl": 27.49,
+          "maxDrawdown": 0.013,
+          "profitFactor": 1.69,
+          "sharpeRatio": 1.12,
+          "sortinoRatio": 151.99,
+          "monthlyConsistency": "N/A"
+        },
+        "validation": {
+          "trades": 22,
+          "effectiveTrades": 13.4,
+          "winRate": 0.65,
+          "wilsonLowerBound": 0.4329,
+          "expectedValue": 0.2025,
+          "evWlb": -0.1992,
+          "totalPnl": 26.44,
+          "maxDrawdown": 0.015,
+          "profitFactor": 1.57,
+          "sharpeRatio": 1.02,
+          "sortinoRatio": 59.58
+        }
+      },
+      "degradation": {
+        "deltaEV": -0.3083,
+        "degradationIndex": -4.1111,
+        "winRateDrop": -0.1667,
+        "stabilityScore": 70.0,
+        "verdict": "ANTIFRAGILE",
+        "subScores": {
+          "psiEV": 1.0,
+          "psiStat": 0.0,
+          "psiTime": 1.0,
+          "psiDD": 1.0
+        }
+      },
+      "governanceVerdict": {
+        "antiMartingaleAudit": "VERIFIED_ZERO_MARTINGALE",
+        "edgeStatus": "CONDITIONAL"
+      }
+    }
+  },
+  "championHypothesis": {
+    "hypothesisId": "H004",
+    "canonicalId": "H004_AUTOCORRELATION_MEAN_REVERSION",
+    "stabilityScore": 70.0,
+    "outOfSampleWinRate": 0.65,
+    "outOfSampleEV": 0.2025,
+    "verdict": "ANTIFRAGILE",
+    "edgeStatus": "CONDITIONAL"
+  }
+}

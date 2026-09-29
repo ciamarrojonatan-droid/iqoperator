@@ -99,3 +99,42 @@ A comunicação de design entre os agentes deve seguir o formato de Context Pagi
 - [ ] O arquivo `requirements.txt` foi atualizado com as bibliotecas necessárias para inferência (ex: `scikit-learn`, `xgboost`).
 - [ ] O `bot.py` inicializa normalmente e carrega o modelo em memória sem lentidão excessiva.
 - [ ] Existe um teste automatizado ou script de validação (`check_ml_filter.py`) provando que a função de inferência processa um candle mockado e cospe a probabilidade correta sem quebrar a tipagem.
+
+## 2026-09-29T02:35:44Z
+
+# Teamwork Project Prompt — Draft
+
+> Status: Ready for launch — awaiting user approval
+> Goal: Craft prompt → get user approval → delegate to teamwork_preview
+> Requested team: Full team
+
+Construir uma arquitetura de pesquisa quantitativa (Backtest & Signal Engine) para Opções Binárias (IQ Option) focada em Regime de Mercado (Trend, Range, Expansion), Filtro de Payout dinâmico e Expectativa Matemática (EV/Wilson Lower Bound) ao invés de simples Winrate.
+
+Working directory: `~/teamwork_projects/iq_regime_adaptive`
+Integrity mode: development
+
+## Requirements
+
+### R1. Regime-Adaptive Feature Engine
+O sistema deve classificar o ambiente de mercado atual (ex: Trend, Range, Expansion, Chaos) baseando-se em volatilidade, ADX e autocorrelação, e rotear o sinal para o setup estatisticamente adequado (ex: Mean Reversion para Range, Pullback para Trend). O estado 'Chaos' deve gerar a decisão explícita de 'NO TRADE'.
+
+### R2. Expiry & Payout Conditional Pipeline
+A avaliação de sinais deve obrigatoriamente cruzar a probabilidade condicional de vitória com o Payout atual. O motor deve calcular a probabilidade de Break-Even ($P_{BE}$) e o Expected Value (EV), executando o trade apenas se $EV > 0$ considerando o limite inferior de Wilson (Wilson Lower Bound).
+
+### R3. Estabilidade Out-of-Sample (OOS)
+A arquitetura deve separar rigidamente os dados em In-Sample (IS), Validation (VAL) e Out-of-Sample (OOS). O framework de backtest deve calcular a degradação de performance entre IS e OOS para avaliar a estabilidade de múltiplas hipóteses (H001-H008).
+
+## Acceptance Criteria
+
+### Verificação Quantitativa
+- [ ] O backtester deve cuspir um relatório que inclua o N efetivo de trades, o EV médio normalizado e o Wilson Lower Bound da taxa de acerto.
+- [ ] A degradação (diferença de EV entre IS e OOS) deve ser calculada automaticamente para as hipóteses processadas.
+- [ ] O código não deve possuir dependências de martingale ou alocação assimétrica irracional (risco fixo/Kelly strict).
+
+## 2026-09-29T02:40:39Z
+
+[URGENTE - NOVA REGRA HARD DO USUÁRIO PARA TODA A EQUIPE TEAMWORK]
+Vocês estão proibidos de usar `cat` ou `Get-Content` ou ferramentas de leitura completa de arquivos (`view_file` completo) que gastem muitos tokens.
+Para economizar tokens, TODOS os agentes devem usar EXCLUSIVAMENTE o sidecar (daemon) do Hypervisor para auditar e extrair o código:
+Execute no terminal: `python -m synaptic_hypervisor.sidecar.daemon --action extract_edges --file <arquivo>`
+Essa é uma REGRA HARD. Repasse para todos os agentes da equipe imediatamente. Cancele leituras massivas em andamento.
