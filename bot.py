@@ -76,6 +76,8 @@ class Bot:
         self.buys_rejected = 0
         self.last_signal: dict[str, str | None] = {}
         self.last_payout: dict[str, float] = {}
+        self.last_payout_src: dict[str, str] = {}
+        self._payout_fallback_streak = 0
         self.last_candle_key: dict[str, str] = {}
         self.last_check: dict[str, str] = {}
         self.pending: list[dict] = []
@@ -300,7 +302,7 @@ class Bot:
                     except Exception:
                         pass
                     from iqoptionapi.stable_api import IQ_Option
-                    self.api = IQ_Option(cfg.IQ_USER, cfg.IQ_PASS)
+                    self.api = IQ_Option(cfg.EMAIL, cfg.PASSWORD)
 
             except Exception as e:
                 log.warning(f"Connect exceÃ§Ã£o (tent. {attempt}): {e}")
@@ -413,6 +415,8 @@ class Bot:
                     if isinstance(sub, dict):
                         try:
                             commission = float(sub["option"]["profit"]["commission"])
+                            self.last_payout_src[asset] = "live_commission"
+                            self._payout_fallback_streak = 0
                             return round((100.0 - commission) / 100.0, 4)
                         except (KeyError, TypeError, ValueError):
                             pass
@@ -422,11 +426,19 @@ class Bot:
                         if isinstance(num, dict):
                             num = next(iter(num.values()), None)
                         if isinstance(num, (int, float)):
+                            self.last_payout_src[asset] = "live_flat"
+                            self._payout_fallback_streak = 0
                             return float(num) / 100 if num > 1 else float(num)
             elif isinstance(v, (int, float)):
+                self.last_payout_src[asset] = "live_flat"
+                self._payout_fallback_streak = 0
                 return float(v) / 100 if v > 1 else float(v)
         except Exception as e:
             log.warning(f"payout fallback {asset}: {e}")
+        self.last_payout_src[asset] = "fallback_default"
+        self._payout_fallback_streak += 1
+        if self._payout_fallback_streak == 10:
+            log.warning(f"payout em fallback {cfg.KELLY_PAYOUT_DEFAULT} há 10 checks seguidos — detail/parse falhando")
         return cfg.KELLY_PAYOUT_DEFAULT
 
     def calc_stake(self, asset: str, payout: float) -> tuple[float, float, float]:
@@ -824,12 +836,17 @@ class Bot:
                         signal_series = self.regime_router.generate_signals(df, payout=payout)
                         raw_signal = signal_series.iloc[-1]
                         signal = raw_signal.lower() if raw_signal != "NO_TRADE" else None
+                        try:
+                            regime = self.regime_router.classifier.classify_latest(df).regime.value
+                        except Exception:
+                            regime = "?"
                         
                         self.last_signal[asset] = signal
                         close_px = float(df["close"].iloc[-1])
                         
                         info = "H008_ROUTER"
-                        detail_s = f"close={close_px:.2f} H008"
+                        payout_src = self.last_payout_src.get(asset, "?")
+                        detail_s = f"close={close_px:.2f} H008 regime={regime} src={payout_src}"
                         
                         self.last_payout[asset] = payout
                         self.last_check[asset] = f"{detail_s} signal={signal} payout={payout:.2f}"
