@@ -78,6 +78,8 @@ class Bot:
         self.last_payout: dict[str, float] = {}
         self.last_payout_src: dict[str, str] = {}
         self._payout_fallback_streak = 0
+        self.last_regime: dict[str, str] = {}
+        self._unavailable_until: dict[str, float] = {}
         self.last_candle_key: dict[str, str] = {}
         self.last_check: dict[str, str] = {}
         self.pending: list[dict] = []
@@ -468,6 +470,9 @@ class Bot:
         if not ok2:
             self.buys_rejected += 1
             log.error(f"Buy rejeitado ({self.buys_rejected}/{self.buys_attempted}): {order_id} (ativo={asset})")
+            if "not available" in str(order_id).lower():
+                self._unavailable_until[asset] = time.time() + 3600
+                log.warning(f"{asset}: marcado CLOSED por 1h (corretora sem oferta) — pulando sem retry.")
             return None
         log.info(f"TRADE {action.upper()} {asset} M{cfg.EXPIRATION} stake={stake} id={order_id}")
         return {"order_id": order_id, "asset": asset, "action": action,
@@ -811,6 +816,8 @@ class Bot:
                             time.sleep(cfg.ASSET_DELAY)
                         if self._in_cooldown(asset):
                             continue
+                        if self._unavailable_until.get(asset, 0) > time.time():
+                            continue
                         if is_toxic:
                             if i == 0: log.info(f"Toxic Hour ({current_utc.hour} UTC) - skipping scan.")
                             continue
@@ -850,7 +857,10 @@ class Bot:
                         
                         self.last_payout[asset] = payout
                         self.last_check[asset] = f"{detail_s} signal={signal} payout={payout:.2f}"
-                        log.info(f"[CHECK] {asset} {candle_key} {detail_s} -> {signal} (payout {payout:.2f})")
+                        prev_regime = self.last_regime.get(asset)
+                        self.last_regime[asset] = regime
+                        if signal or regime != prev_regime:
+                            log.info(f"[CHECK] {asset} {candle_key} {detail_s} -> {signal} (payout {payout:.2f})")
                         self._write_status()
                         
                         if not signal:
