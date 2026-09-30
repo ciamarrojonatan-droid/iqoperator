@@ -58,6 +58,7 @@ ML_THRESHOLD="0.55"
   - `83b434e` — feat(quant): integra H008 Regime-Adaptive router e backtest engine
 
 ## 4. Próximos Passos
-- **Atualizar Railway `.env`** com a nova lista de 8 ativos validados.
+- **Deploy sprints 1-4 (2026-09-30):** fix reconnect `cfg.IQ_USER`, observabilidade payout src + regime no `[CHECK]`, guard CLOSED 1h anti-retry, log diet (só sinal/mudança de regime).
 - **Forward Test:** Coletar `trades_live.csv` do HuggingFace após 1–2 semanas e comparar WR real vs WR OOS.
+- **Replay H008 offline:** rodando sobre `data/*_M5_iq.csv` para comparar taxa de sinal live vs OOS por ativo.
 - **Transição para REAL:** Somente se WR forward test ≥ WLB OOS por ativo com N ≥ 50 trades.
