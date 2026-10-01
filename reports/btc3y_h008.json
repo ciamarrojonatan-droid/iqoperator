@@ -1,0 +1,130 @@
+{
+  "title": "Quantitative Verification & Research Report: Binary Options Regime-Adaptive Engine",
+  "generatedAt": "2026-10-01T05:50:13.180357+00:00",
+  "payoutTested": 0.85,
+  "breakevenHurdle": 0.54054,
+  "dataset": {
+    "path": "data\\BTCUSDT_M5_3y.csv",
+    "totalBars": 315360,
+    "span": {
+      "start": "2023-09-28 07:15:00+00:00",
+      "end": "2026-09-27 07:10:00+00:00"
+    },
+    "partitionRatios": {
+      "inSample": 0.5,
+      "validation": 0.25,
+      "outOfSample": 0.25
+    },
+    "warmupBars": 60
+  },
+  "governanceAttestation": {
+    "antiMartingaleAudit": "VERIFIED_ZERO_MARTINGALE",
+    "allocationCompliance": "FIXED_RISK_AND_STRICT_KELLY_COMPLIANT",
+    "zeroMartingaleConfirmed": true,
+    "lossResponseNonIncreasing": true,
+    "maxRiskCapEnforced": true,
+    "capitalKillSwitchActive": true,
+    "auditPassed": true,
+    "attestationStatement": "The backtest engine and execution models strictly forbid martingale, grid-averaging, and irrational asymmetric loss recovery multipliers. All stake allocations adhere to regularized fractional Kelly (gamma=0.25) and fixed fractional risk with non-increasing loss response and strict equity caps.",
+    "checkedTradesCount": 60,
+    "violationsDetected": []
+  },
+  "degradationMatrix": [
+    {
+      "hypothesisId": "H008",
+      "canonicalId": "H008_REGIME_ADAPTIVE_ENSEMBLE_ROUTER",
+      "family": "META_ENSEMBLE_ROUTER",
+      "n_is": 20,
+      "wr_is": 0.55,
+      "ev_is": 0.0175,
+      "n_oos": 20,
+      "wr_oos": 0.5,
+      "wlb_oos": 0.2993,
+      "ev_oos": -0.075,
+      "delta_ev": 0.0925,
+      "degradation_index": 5.2857,
+      "stability_score": 32.2,
+      "verdict": "REJECTED",
+      "edgeStatus": "REJECTED"
+    }
+  ],
+  "hypotheses": {
+    "H008_REGIME_ADAPTIVE_ENSEMBLE_ROUTER": {
+      "hypothesisId": "H008_REGIME_ADAPTIVE_ENSEMBLE_ROUTER",
+      "shortId": "H008",
+      "family": "META_ENSEMBLE_ROUTER",
+      "name": "Regime-Adaptive Meta-Router",
+      "description": "Dynamically routes signals across regimes with strict Chaos veto.",
+      "payoutTested": 0.85,
+      "breakevenHurdle": 0.54054,
+      "partitions": {
+        "inSample": {
+          "trades": 20,
+          "effectiveTrades": 8.1,
+          "winRate": 0.55,
+          "wilsonLowerBound": 0.3421,
+          "expectedValue": 0.0175,
+          "evWlb": -0.3671,
+          "totalPnl": 1.92,
+          "maxDrawdown": 0.0332,
+          "profitFactor": 1.03,
+          "sharpeRatio": 0.07,
+          "sortinoRatio": 5.15
+        },
+        "outOfSample": {
+          "trades": 20,
+          "effectiveTrades": 10.5,
+          "winRate": 0.5,
+          "wilsonLowerBound": 0.2993,
+          "expectedValue": -0.075,
+          "evWlb": -0.4463,
+          "totalPnl": -10.12,
+          "maxDrawdown": 0.0425,
+          "profitFactor": 0.84,
+          "sharpeRatio": -0.38,
+          "sortinoRatio": -29.33,
+          "monthlyConsistency": "N/A"
+        },
+        "validation": {
+          "trades": 20,
+          "effectiveTrades": 15.2,
+          "winRate": 0.55,
+          "wilsonLowerBound": 0.3421,
+          "expectedValue": 0.0175,
+          "evWlb": -0.3671,
+          "totalPnl": 1.92,
+          "maxDrawdown": 0.0215,
+          "profitFactor": 1.03,
+          "sharpeRatio": 0.07,
+          "sortinoRatio": 12.01
+        }
+      },
+      "degradation": {
+        "deltaEV": 0.0925,
+        "degradationIndex": 5.2857,
+        "winRateDrop": 0.05,
+        "stabilityScore": 32.2,
+        "verdict": "REJECTED",
+        "subScores": {
+          "psiEV": 0.0,
+          "psiStat": 0.0,
+          "psiTime": 1.0,
+          "psiDD": 0.815
+        }
+      },
+      "governanceVerdict": {
+        "antiMartingaleAudit": "VERIFIED_ZERO_MARTINGALE",
+        "edgeStatus": "REJECTED"
+      }
+    }
+  },
+  "championHypothesis": {
+    "hypothesisId": "H008",
+    "canonicalId": "H008_REGIME_ADAPTIVE_ENSEMBLE_ROUTER",
+    "stabilityScore": 32.2,
+    "outOfSampleWinRate": 0.5,
+    "outOfSampleEV": -0.075,
+    "verdict": "REJECTED",
+    "edgeStatus": "REJECTED"
+  }
+}
