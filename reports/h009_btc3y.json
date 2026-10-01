@@ -1,0 +1,130 @@
+{
+  "title": "Quantitative Verification & Research Report: Binary Options Regime-Adaptive Engine",
+  "generatedAt": "2026-10-01T07:09:24.799455+00:00",
+  "payoutTested": 0.85,
+  "breakevenHurdle": 0.54054,
+  "dataset": {
+    "path": "data\\BTCUSDT_M5_3y.csv",
+    "totalBars": 315360,
+    "span": {
+      "start": "2023-09-28 07:15:00+00:00",
+      "end": "2026-09-27 07:10:00+00:00"
+    },
+    "partitionRatios": {
+      "inSample": 0.5,
+      "validation": 0.25,
+      "outOfSample": 0.25
+    },
+    "warmupBars": 60
+  },
+  "governanceAttestation": {
+    "antiMartingaleAudit": "VERIFIED_ZERO_MARTINGALE",
+    "allocationCompliance": "FIXED_RISK_AND_STRICT_KELLY_COMPLIANT",
+    "zeroMartingaleConfirmed": true,
+    "lossResponseNonIncreasing": true,
+    "maxRiskCapEnforced": true,
+    "capitalKillSwitchActive": true,
+    "auditPassed": true,
+    "attestationStatement": "The backtest engine and execution models strictly forbid martingale, grid-averaging, and irrational asymmetric loss recovery multipliers. All stake allocations adhere to regularized fractional Kelly (gamma=0.25) and fixed fractional risk with non-increasing loss response and strict equity caps.",
+    "checkedTradesCount": 61,
+    "violationsDetected": []
+  },
+  "degradationMatrix": [
+    {
+      "hypothesisId": "H009",
+      "canonicalId": "H009_SQUEEZE_BREAKOUT_FOLLOW",
+      "family": "REGIME_TRANSITION_EDGE",
+      "n_is": 21,
+      "wr_is": 0.65,
+      "ev_is": 0.2025,
+      "n_oos": 20,
+      "wr_oos": 0.35,
+      "wlb_oos": 0.1812,
+      "ev_oos": -0.3525,
+      "delta_ev": 0.555,
+      "degradation_index": 2.7407,
+      "stability_score": 22.7,
+      "verdict": "REJECTED",
+      "edgeStatus": "REJECTED"
+    }
+  ],
+  "hypotheses": {
+    "H009_SQUEEZE_BREAKOUT_FOLLOW": {
+      "hypothesisId": "H009_SQUEEZE_BREAKOUT_FOLLOW",
+      "shortId": "H009",
+      "family": "REGIME_TRANSITION_EDGE",
+      "name": "Squeeze-Gated Breakout Follow",
+      "description": "Follows confirmed Donchian breaks occurring under volatility compression.",
+      "payoutTested": 0.85,
+      "breakevenHurdle": 0.54054,
+      "partitions": {
+        "inSample": {
+          "trades": 21,
+          "effectiveTrades": 13.4,
+          "winRate": 0.65,
+          "wilsonLowerBound": 0.4329,
+          "expectedValue": 0.2025,
+          "evWlb": -0.1992,
+          "totalPnl": 26.43,
+          "maxDrawdown": 0.0096,
+          "profitFactor": 1.57,
+          "sharpeRatio": 1.01,
+          "sortinoRatio": 95.6
+        },
+        "outOfSample": {
+          "trades": 20,
+          "effectiveTrades": 11.1,
+          "winRate": 0.35,
+          "wilsonLowerBound": 0.1812,
+          "expectedValue": -0.3525,
+          "evWlb": -0.6648,
+          "totalPnl": -45.36,
+          "maxDrawdown": 0.0506,
+          "profitFactor": 0.46,
+          "sharpeRatio": -1.8,
+          "sortinoRatio": -120.89,
+          "monthlyConsistency": "N/A"
+        },
+        "validation": {
+          "trades": 20,
+          "effectiveTrades": 17.7,
+          "winRate": 0.6,
+          "wilsonLowerBound": 0.3866,
+          "expectedValue": 0.11,
+          "evWlb": -0.2848,
+          "totalPnl": 14.1,
+          "maxDrawdown": 0.0195,
+          "profitFactor": 1.27,
+          "sharpeRatio": 0.53,
+          "sortinoRatio": 102.28
+        }
+      },
+      "degradation": {
+        "deltaEV": 0.555,
+        "degradationIndex": 2.7407,
+        "winRateDrop": 0.3,
+        "stabilityScore": 22.7,
+        "verdict": "REJECTED",
+        "subScores": {
+          "psiEV": 0.0,
+          "psiStat": 0.0,
+          "psiTime": 1.0,
+          "psiDD": 0.178
+        }
+      },
+      "governanceVerdict": {
+        "antiMartingaleAudit": "VERIFIED_ZERO_MARTINGALE",
+        "edgeStatus": "REJECTED"
+      }
+    }
+  },
+  "championHypothesis": {
+    "hypothesisId": "H009",
+    "canonicalId": "H009_SQUEEZE_BREAKOUT_FOLLOW",
+    "stabilityScore": 22.7,
+    "outOfSampleWinRate": 0.35,
+    "outOfSampleEV": -0.3525,
+    "verdict": "REJECTED",
+    "edgeStatus": "REJECTED"
+  }
+}
