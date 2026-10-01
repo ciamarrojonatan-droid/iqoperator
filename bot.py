@@ -39,6 +39,8 @@ log = logging.getLogger("iqrobot")
 TRADE_HEADER = ["time", "asset", "signal", "info", "payout", "winrate",
                 "kelly", "stake", "profit", "balance"]
 
+LAST_CANDLE_FILE = "data/last_candle_key.json"
+
 
 class Bot:
     def __init__(self):
@@ -81,6 +83,7 @@ class Bot:
         self.last_regime: dict[str, str] = {}
         self._unavailable_until: dict[str, float] = {}
         self.last_candle_key: dict[str, str] = {}
+        self._dedup_count: dict[str, int] = {}
         self.last_check: dict[str, str] = {}
         self.pending: list[dict] = []
         self.martingale_step = 0
@@ -97,6 +100,7 @@ class Bot:
         self._hard_reconnect_count = 0
         self._trade_log_init()
         self._load_pending()
+        self._load_candle_keys()
         from iq_regime_adaptive.hypotheses.h008_regime_adaptive_router import H008RegimeAdaptiveRouter
         self.regime_router = H008RegimeAdaptiveRouter()
         self.ml_filter = None
@@ -186,6 +190,7 @@ class Bot:
             os.makedirs(os.path.dirname(cfg.PENDING_FILE) or ".", exist_ok=True)
             with open(cfg.PENDING_FILE, "w", encoding="utf-8") as f:
                 json.dump(self.pending, f)
+            self._save_candle_keys()
         except Exception as e:
             log.warning(f"save_pending: {e}")
 
@@ -205,6 +210,60 @@ class Bot:
                 log.info(f"Recuperadas {len(kept)} pendÃªncia(s) do disco.")
         except Exception as e:
             log.warning(f"load_pending: {e}")
+
+    def _load_candle_keys(self):
+        try:
+            if not os.path.exists(LAST_CANDLE_FILE):
+                return
+            with open(LAST_CANDLE_FILE, encoding="utf-8") as f:
+                data = json.load(f)
+            if isinstance(data, dict):
+                self.last_candle_key = {str(k): str(v) for k, v in data.items()}
+                if data:
+                    log.info(f"Recuperadas {len(data)} last_candle_key(s) do disco.")
+        except Exception as e:
+            log.warning(f"load_candle_keys: {e}")
+
+    def _save_candle_keys(self):
+        try:
+            os.makedirs(os.path.dirname(LAST_CANDLE_FILE) or ".", exist_ok=True)
+            with open(LAST_CANDLE_FILE, "w", encoding="utf-8") as f:
+                json.dump(self.last_candle_key, f)
+        except Exception as e:
+            log.warning(f"save_candle_keys: {e}")
+
+    def _candle_time(self, df):
+        """Timestamp (s) da ultima linha via coluna de tempo; None se ausente."""
+        try:
+            last = df.iloc[-1]
+        except Exception:
+            return None
+        for col in ("from", "at", "open_time", "time", "date", "timestamp"):
+            if col in df.columns:
+                try:
+                    v = float(last[col])
+                    if v > 0:
+                        if v > 1e12:
+                            v /= 1000.0
+                        elif v > 1e10:
+                            v /= 1000.0
+                        return int(v)
+                except (TypeError, ValueError):
+                    continue
+        return None
+
+    def _closed_eval_frame(self, df):
+        """Retorna (df_eval, forming, ts_eval): descarta candle em formacao."""
+        ts = self._candle_time(df)
+        if ts is None:
+            return df, False, None
+        now = time.time()
+        if ts > now - cfg.TIMEFRAME:
+            if len(df) > 1:
+                df_closed = df.iloc[:-1]
+                return df_closed, True, self._candle_time(df_closed)
+            return df, False, ts
+        return df, False, ts
 
     # ---------- log de trades ----------
     def _trade_log_init(self):
@@ -817,43 +876,57 @@ class Bot:
                         if self._in_cooldown(asset):
                             continue
                         if self._unavailable_until.get(asset, 0) > time.time():
+                            log.info(f"VETO {asset} veto_code=UNAVAILABLE sem oferta da corretora (cooldown 1h).")
                             continue
                         if is_toxic:
-                            if i == 0: log.info(f"Toxic Hour ({current_utc.hour} UTC) - skipping scan.")
+                            if i == 0: log.info(f"Toxic Hour ({current_utc.hour} UTC) - skipping scan veto_code=TOXIC.")
                             continue
                         if is_news:
-                            if i == 0: log.info(f"High Impact News Time - skipping scan.")
+                            if i == 0: log.info(f"High Impact News Time - skipping scan veto_code=NEWS.")
                             continue
                         payout = self.get_payout(asset, detail)
                         if payout < cfg.PAYOUT_MIN:
+                            log.info(f"VETO {asset} payout={payout:.2f} < minimo veto_code=PAYOUT_MIN.")
                             continue
                         df = self.candles_df(asset, cfg.TIMEFRAME, cfg.CANDLE_COUNT)
                         if df is None or df.empty:
                             log.warning(f"Sem candles ({asset} M{cfg.EXPIRATION}) â€” aguardando.")
                             continue
                         got += 1
-                        candle_key = self._candle_key(df)
+                        df_eval, forming, candle_ts = self._closed_eval_frame(df)
+                        if df_eval is None or df_eval.empty:
+                            log.warning(f"Sem candle fechado ({asset}) — so forming disponivel.")
+                            continue
+                        candle_key = self._candle_key(df_eval)
                         if candle_key == self.last_candle_key.get(asset):
+                            self._dedup_count[asset] = self._dedup_count.get(asset, 0) + 1
+                            log.debug(f"DEDUP_SKIP {asset} {candle_key} veto_code=DEDUP n={self._dedup_count[asset]}")
                             continue
                         self.last_candle_key[asset] = candle_key
+                        self._save_candle_keys()
                         if candle_key.startswith("noclock:"):
                             log.warning(f"{asset}: coluna de tempo ausente nos candles â€” avaliando sem dedup por candle.")
 
                         # H008 Regime-Adaptive Router
-                        signal_series = self.regime_router.generate_signals(df, payout=payout)
+                        signal_series = self.regime_router.generate_signals(df_eval, payout=payout)
                         raw_signal = signal_series.iloc[-1]
                         signal = raw_signal.lower() if raw_signal != "NO_TRADE" else None
                         try:
-                            regime = self.regime_router.classifier.classify_latest(df).regime.value
+                            regime = self.regime_router.classifier.classify_latest(df_eval).regime.value
                         except Exception:
                             regime = "?"
                         
                         self.last_signal[asset] = signal
-                        close_px = float(df["close"].iloc[-1])
-                        
+                        close_px = float(df_eval["close"].iloc[-1])
+
                         info = "H008_ROUTER"
                         payout_src = self.last_payout_src.get(asset, "?")
+                        lag_s = int(time.time() - candle_ts) if candle_ts else None
+                        forming_s = "dropped" if forming else ("ok" if candle_ts is not None else "noclock")
                         detail_s = f"close={close_px:.2f} H008 regime={regime} src={payout_src}"
+                        if lag_s is not None:
+                            detail_s += f" lag_s={lag_s}"
+                        detail_s += f" forming={forming_s}"
                         
                         self.last_payout[asset] = payout
                         self.last_check[asset] = f"{detail_s} signal={signal} payout={payout:.2f}"
@@ -866,7 +939,7 @@ class Bot:
                         if not signal:
                             continue
                         if len(self.pending) >= cfg.MAX_CONCURRENT:
-                            log.info(f"SINAL {signal.upper()} {asset} ignorado: cap {cfg.MAX_CONCURRENT} pendentes atingido.")
+                            log.info(f"SINAL {signal.upper()} {asset} ignorado: cap {cfg.MAX_CONCURRENT} pendentes atingido veto_code=CAP.")
                             continue
 
                         stake, p, kfull = self.calc_stake(asset, payout)
