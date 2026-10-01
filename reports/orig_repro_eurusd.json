@@ -1,0 +1,130 @@
+{
+  "title": "Quantitative Verification & Research Report: Binary Options Regime-Adaptive Engine",
+  "generatedAt": "2026-10-01T03:28:24.309736+00:00",
+  "payoutTested": 0.85,
+  "breakevenHurdle": 0.54054,
+  "dataset": {
+    "path": "data\\EURUSD_M5_iq.csv",
+    "totalBars": 20000,
+    "span": {
+      "start": "2026-06-22 10:20:00+00:00",
+      "end": "2026-09-25 20:55:00+00:00"
+    },
+    "partitionRatios": {
+      "inSample": 0.5,
+      "validation": 0.25,
+      "outOfSample": 0.25
+    },
+    "warmupBars": 60
+  },
+  "governanceAttestation": {
+    "antiMartingaleAudit": "VERIFIED_ZERO_MARTINGALE",
+    "allocationCompliance": "FIXED_RISK_AND_STRICT_KELLY_COMPLIANT",
+    "zeroMartingaleConfirmed": true,
+    "lossResponseNonIncreasing": true,
+    "maxRiskCapEnforced": true,
+    "capitalKillSwitchActive": true,
+    "auditPassed": true,
+    "attestationStatement": "The backtest engine and execution models strictly forbid martingale, grid-averaging, and irrational asymmetric loss recovery multipliers. All stake allocations adhere to regularized fractional Kelly (gamma=0.25) and fixed fractional risk with non-increasing loss response and strict equity caps.",
+    "checkedTradesCount": 61,
+    "violationsDetected": []
+  },
+  "degradationMatrix": [
+    {
+      "hypothesisId": "H008",
+      "canonicalId": "H008_REGIME_ADAPTIVE_ENSEMBLE_ROUTER",
+      "family": "META_ENSEMBLE_ROUTER",
+      "n_is": 20,
+      "wr_is": 0.5,
+      "ev_is": -0.075,
+      "n_oos": 19,
+      "wr_oos": 0.6667,
+      "wlb_oos": 0.4375,
+      "ev_oos": 0.2333,
+      "delta_ev": -0.3083,
+      "degradation_index": -4.1111,
+      "stability_score": 70.0,
+      "verdict": "ANTIFRAGILE",
+      "edgeStatus": "CONDITIONAL"
+    }
+  ],
+  "hypotheses": {
+    "H008_REGIME_ADAPTIVE_ENSEMBLE_ROUTER": {
+      "hypothesisId": "H008_REGIME_ADAPTIVE_ENSEMBLE_ROUTER",
+      "shortId": "H008",
+      "family": "META_ENSEMBLE_ROUTER",
+      "name": "Regime-Adaptive Meta-Router",
+      "description": "Dynamically routes signals across regimes with strict Chaos veto.",
+      "payoutTested": 0.85,
+      "breakevenHurdle": 0.54054,
+      "partitions": {
+        "inSample": {
+          "trades": 20,
+          "effectiveTrades": 20.0,
+          "winRate": 0.5,
+          "wilsonLowerBound": 0.2993,
+          "expectedValue": -0.075,
+          "evWlb": -0.4463,
+          "totalPnl": -10.13,
+          "maxDrawdown": 0.0244,
+          "profitFactor": 0.85,
+          "sharpeRatio": -0.37,
+          "sortinoRatio": -73.08
+        },
+        "outOfSample": {
+          "trades": 19,
+          "effectiveTrades": 10.0,
+          "winRate": 0.6667,
+          "wilsonLowerBound": 0.4375,
+          "expectedValue": 0.2333,
+          "evWlb": -0.1906,
+          "totalPnl": 27.49,
+          "maxDrawdown": 0.013,
+          "profitFactor": 1.69,
+          "sharpeRatio": 1.12,
+          "sortinoRatio": 151.99,
+          "monthlyConsistency": "N/A"
+        },
+        "validation": {
+          "trades": 22,
+          "effectiveTrades": 13.4,
+          "winRate": 0.65,
+          "wilsonLowerBound": 0.4329,
+          "expectedValue": 0.2025,
+          "evWlb": -0.1992,
+          "totalPnl": 26.44,
+          "maxDrawdown": 0.015,
+          "profitFactor": 1.57,
+          "sharpeRatio": 1.02,
+          "sortinoRatio": 59.58
+        }
+      },
+      "degradation": {
+        "deltaEV": -0.3083,
+        "degradationIndex": -4.1111,
+        "winRateDrop": -0.1667,
+        "stabilityScore": 70.0,
+        "verdict": "ANTIFRAGILE",
+        "subScores": {
+          "psiEV": 1.0,
+          "psiStat": 0.0,
+          "psiTime": 1.0,
+          "psiDD": 1.0
+        }
+      },
+      "governanceVerdict": {
+        "antiMartingaleAudit": "VERIFIED_ZERO_MARTINGALE",
+        "edgeStatus": "CONDITIONAL"
+      }
+    }
+  },
+  "championHypothesis": {
+    "hypothesisId": "H008",
+    "canonicalId": "H008_REGIME_ADAPTIVE_ENSEMBLE_ROUTER",
+    "stabilityScore": 70.0,
+    "outOfSampleWinRate": 0.6667,
+    "outOfSampleEV": 0.2333,
+    "verdict": "ANTIFRAGILE",
+    "edgeStatus": "CONDITIONAL"
+  }
+}
