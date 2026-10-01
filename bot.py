@@ -471,8 +471,9 @@ class Bot:
             return
         self._detail_schema_logged = True
         try:
+            n = len(detail) if isinstance(detail, dict) else 0
             top = list(detail.keys())[:12] if isinstance(detail, dict) else type(detail).__name__
-            log.warning(f"PAYOUT_SCHEMA top={top}")
+            log.warning(f"PAYOUT_SCHEMA n={n} top={top}")
             for asset in self.assets:
                 v = detail.get(asset) if isinstance(detail, dict) else None
                 if isinstance(v, dict):
@@ -484,7 +485,18 @@ class Bot:
                             sub[k] = type(sv).__name__
                     log.warning(f"PAYOUT_SCHEMA {asset} keys={sub}")
                     return
-            log.warning(f"PAYOUT_SCHEMA nenhum dos {len(self.assets)} ativos no detail")
+            # Fuzzy: acha chaves que contém o nome base (ex: EURUSD-op, EURUSD-OTC)
+            if isinstance(detail, dict):
+                for asset in self.assets:
+                    hits = [k for k in detail.keys() if asset in str(k).upper()][:6]
+                    if hits:
+                        v = detail.get(hits[0])
+                        sub = {}
+                        if isinstance(v, dict):
+                            for k, sv in list(v.items())[:6]:
+                                sub[k] = list(sv.keys())[:6] if isinstance(sv, dict) else type(sv).__name__
+                        log.warning(f"PAYOUT_SCHEMA FUZZY {asset} hits={hits} struct={sub}")
+            log.warning(f"PAYOUT_SCHEMA nenhum dos {len(self.assets)} ativos no detail (match exato)")
         except Exception as e:
             log.warning(f"PAYOUT_SCHEMA probe falhou: {e}")
 
