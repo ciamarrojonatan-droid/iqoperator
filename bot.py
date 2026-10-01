@@ -82,6 +82,7 @@ class Bot:
         self._payout_fallback_streak = 0
         self.last_regime: dict[str, str] = {}
         self._unavailable_until: dict[str, float] = {}
+        self._detail_schema_logged = False
         self.last_candle_key: dict[str, str] = {}
         self._dedup_count: dict[str, int] = {}
         self.last_check: dict[str, str] = {}
@@ -464,6 +465,29 @@ class Bot:
         self._detail_cache = (time.time(), detail)
         return detail
 
+    def _log_detail_schema_once(self, detail) -> None:
+        """Probe 1x do schema real do payout (só chaves, sem valores sensíveis)."""
+        if self._detail_schema_logged:
+            return
+        self._detail_schema_logged = True
+        try:
+            top = list(detail.keys())[:12] if isinstance(detail, dict) else type(detail).__name__
+            log.warning(f"PAYOUT_SCHEMA top={top}")
+            for asset in self.assets:
+                v = detail.get(asset) if isinstance(detail, dict) else None
+                if isinstance(v, dict):
+                    sub = {}
+                    for k, sv in list(v.items())[:6]:
+                        if isinstance(sv, dict):
+                            sub[k] = list(sv.keys())[:6]
+                        else:
+                            sub[k] = type(sv).__name__
+                    log.warning(f"PAYOUT_SCHEMA {asset} keys={sub}")
+                    return
+            log.warning(f"PAYOUT_SCHEMA nenhum dos {len(self.assets)} ativos no detail")
+        except Exception as e:
+            log.warning(f"PAYOUT_SCHEMA probe falhou: {e}")
+
     def get_payout(self, asset: str, detail=None) -> float:
         try:
             if detail is None:
@@ -841,6 +865,7 @@ class Bot:
                         self.homeostasis.sleep_with_heartbeat(60.0)
                         self._touch_progress()
                         continue
+                    self._log_detail_schema_once(detail)
                     self._reconcile_pending()
 
                     # sinal manual tem prioridade (botao cockpit)
