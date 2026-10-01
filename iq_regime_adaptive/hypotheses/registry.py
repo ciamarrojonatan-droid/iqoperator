@@ -17,6 +17,7 @@ from iq_regime_adaptive.hypotheses.h005_mtf_trend_alignment import H005MTFTrendA
 from iq_regime_adaptive.hypotheses.h006_payout_filtered_edge import H006PayoutFilteredEdge
 from iq_regime_adaptive.hypotheses.h007_squeeze_breakout import H007SqueezeBreakout
 from iq_regime_adaptive.hypotheses.h008_regime_adaptive_router import H008RegimeAdaptiveRouter
+from iq_regime_adaptive.hypotheses.h009_squeeze_breakout_follow import H009SqueezeBreakoutFollow
 
 
 HYPOTHESIS_REGISTRY: Dict[str, Type[BaseHypothesis]] = {
@@ -36,6 +37,8 @@ HYPOTHESIS_REGISTRY: Dict[str, Type[BaseHypothesis]] = {
     "H007_VOLATILITY_CONTRACTION_SQUEEZE": H007SqueezeBreakout,
     "H008": H008RegimeAdaptiveRouter,
     "H008_REGIME_ADAPTIVE_ENSEMBLE_ROUTER": H008RegimeAdaptiveRouter,
+    "H009": H009SqueezeBreakoutFollow,
+    "H009_SQUEEZE_BREAKOUT_FOLLOW": H009SqueezeBreakoutFollow,
 }
 
 CANONICAL_IDS = [
