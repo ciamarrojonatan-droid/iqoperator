@@ -500,36 +500,76 @@ class Bot:
         except Exception as e:
             log.warning(f"PAYOUT_SCHEMA probe falhou: {e}")
 
+    def _detail_lookup(self, asset: str, detail) -> tuple[str | None, object]:
+        """Acha o ativo no detail tentando sufixos reais da API (-op, -OTC)."""
+        if not isinstance(detail, dict):
+            return None, None
+        for key in (asset, f"{asset}-op", f"{asset}-OTC"):
+            if key in detail:
+                return key, detail[key]
+        return None, None
+
+    def _find_commission(self, obj, depth: int = 0):
+        """Busca recursiva por 'commission' numérico (schema varia por versão)."""
+        if depth > 4:
+            return None
+        if isinstance(obj, dict):
+            if "commission" in obj:
+                try:
+                    return float(obj["commission"])
+                except (TypeError, ValueError):
+                    pass
+            for sub in obj.values():
+                found = self._find_commission(sub, depth + 1)
+                if found is not None:
+                    return found
+        return None
+
     def get_payout(self, asset: str, detail=None) -> float:
         try:
             if detail is None:
                 detail = self.api.get_binary_option_detail()
-            v = detail.get(asset) if isinstance(detail, dict) else None
+            key, v = self._detail_lookup(asset, detail)
             if isinstance(v, dict):
-                # estrutura real: {"binary": {"option": {"profit": {"commission": X}}}, ...}
                 for k in ("binary", "turbo"):
                     sub = v.get(k)
-                    if isinstance(sub, dict):
-                        try:
-                            commission = float(sub["option"]["profit"]["commission"])
-                            self.last_payout_src[asset] = "live_commission"
-                            self._payout_fallback_streak = 0
-                            return round((100.0 - commission) / 100.0, 4)
-                        except (KeyError, TypeError, ValueError):
-                            pass
+                    commission = self._find_commission(sub)
+                    if commission is not None:
+                        self.last_payout_src[asset] = f"live_commission:{key}:{k}"
+                        self._payout_fallback_streak = 0
+                        return round((100.0 - commission) / 100.0, 4)
                 for k in ("profit", "payout", "turbo", "binary"):
                     if k in v:
                         num = v[k]
                         if isinstance(num, dict):
                             num = next(iter(num.values()), None)
                         if isinstance(num, (int, float)):
-                            self.last_payout_src[asset] = "live_flat"
+                            self.last_payout_src[asset] = f"live_flat:{key}:{k}"
                             self._payout_fallback_streak = 0
                             return float(num) / 100 if num > 1 else float(num)
             elif isinstance(v, (int, float)):
-                self.last_payout_src[asset] = "live_flat"
+                self.last_payout_src[asset] = f"live_flat:{key}"
                 self._payout_fallback_streak = 0
                 return float(v) / 100 if v > 1 else float(v)
+            # Fallback 2: get_all_profit (mesmo mapeamento de nomes do probe_assets)
+            # com cache próprio para não martelar a API a cada ciclo.
+            pts, pcur = getattr(self, "_profit_cache", (0.0, None))
+            if pcur is not None and time.time() - pts < 120:
+                profits, ok = pcur, True
+            else:
+                ok, profits = self._call_timeout(self.api.get_all_profit, 15, f"get_all_profit {asset}")
+                if ok and isinstance(profits, dict):
+                    self._profit_cache = (time.time(), profits)
+            if ok and isinstance(profits, dict):
+                for pkey in (asset, f"{asset}-op", f"{asset}-OTC"):
+                    pv = profits.get(pkey)
+                    if isinstance(pv, dict):
+                        for k in ("binary", "turbo"):
+                            num = pv.get(k)
+                            if isinstance(num, (int, float)):
+                                self.last_payout_src[asset] = f"live_profit:{pkey}:{k}"
+                                self._payout_fallback_streak = 0
+                                return float(num) / 100 if num > 1 else float(num)
         except Exception as e:
             log.warning(f"payout fallback {asset}: {e}")
         self.last_payout_src[asset] = "fallback_default"
