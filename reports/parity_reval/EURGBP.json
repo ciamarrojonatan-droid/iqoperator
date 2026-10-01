@@ -1,0 +1,51 @@
+{
+  "ativo": "EURGBP",
+  "csv": "data/EURGBP_M5_iq.csv",
+  "hipotese": "H008RegimeAdaptiveRouter",
+  "paridade": {
+    "loader": "DataLoader().load_csv",
+    "barras_fechadas": true,
+    "forming_bar_descartada": false,
+    "datetime_index": "coluna time (UTC)",
+    "payout": 0.87,
+    "horizon_bars": 1,
+    "blocked_hours_utc": [
+      5,
+      8,
+      12,
+      21,
+      23
+    ]
+  },
+  "subset": {
+    "usou_tail": false,
+    "tail_n": null,
+    "motivo": null
+  },
+  "n_barras": 20000,
+  "n_barras_usadas": 20000,
+  "n_candidates": 126,
+  "n_trades": 20,
+  "vetoed": 106,
+  "purged": 0,
+  "winrate": 0.35,
+  "ev": -0.34550000000000003,
+  "wilson_lb": 0.1811895478679446,
+  "ev_wlb": -0.6611755454869436,
+  "breakeven_wr": 0.53475935828877,
+  "wins": 7,
+  "losses": 13,
+  "pushes": 0,
+  "veto_code_dist": {
+    "NEWS": 34,
+    "ALLOW": 20,
+    "PAYOUT": 72
+  },
+  "regime_dist": {
+    "CHAOS": 14710,
+    "RANGE": 4438,
+    "TREND": 812,
+    "EXPANSION": 40
+  },
+  "elapsed_sec": 224.8
+}

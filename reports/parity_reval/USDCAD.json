@@ -1,0 +1,42 @@
+{
+  "ativo": "USDCAD",
+  "arquivo": "data/USDCAD_M5_iq.csv",
+  "hipotese": "H008_REGIME_ADAPTIVE_ENSEMBLE_ROUTER",
+  "payout_usado": 0.87,
+  "horizon_bars": 1,
+  "blocked_hours_utc": [
+    5,
+    8,
+    12,
+    21,
+    23
+  ],
+  "n_barras_total": 20000,
+  "tail_aplicado": null,
+  "n_barras_usadas": 20000,
+  "n_candidates": 133,
+  "n_trades": 20,
+  "vetoed": 113,
+  "purged": 0,
+  "wins": 11,
+  "losses": 9,
+  "pushes": 0,
+  "winrate": 0.55,
+  "ev": 0.028500000000000192,
+  "ev_wlb": -0.36030664446478855,
+  "wilson_lower_bound": 0.34208200830759966,
+  "breakeven_win_rate": 0.53475935828877,
+  "total_pnl": 4.677399999999992,
+  "distribuicao_veto_code": {
+    "ALLOW": 20,
+    "NEWS": 39,
+    "WILSON": 74
+  },
+  "distribuicao_regimes": {
+    "CHAOS": 15027,
+    "RANGE": 3919,
+    "TREND": 1026,
+    "EXPANSION": 28
+  },
+  "duracao_s": 422.8
+}

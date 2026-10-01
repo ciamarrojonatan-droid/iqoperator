@@ -1,0 +1,51 @@
+{
+  "ativo": "USDJPY",
+  "csv": "data/USDJPY_M5_iq.csv",
+  "hipotese": "H008RegimeAdaptiveRouter",
+  "paridade": {
+    "loader": "DataLoader().load_csv",
+    "barras_fechadas": true,
+    "forming_bar_descartada": false,
+    "datetime_index": "coluna time (UTC)",
+    "payout": 0.87,
+    "horizon_bars": 1,
+    "blocked_hours_utc": [
+      5,
+      8,
+      12,
+      21,
+      23
+    ]
+  },
+  "subset": {
+    "usou_tail": false,
+    "tail_n": null,
+    "motivo": null
+  },
+  "n_barras": 20000,
+  "n_barras_usadas": 20000,
+  "n_candidates": 110,
+  "n_trades": 20,
+  "vetoed": 90,
+  "purged": 0,
+  "winrate": 0.6,
+  "ev": 0.12200000000000011,
+  "wilson_lb": 0.38657794231520604,
+  "ev_wlb": -0.2770992478705647,
+  "breakeven_wr": 0.53475935828877,
+  "wins": 12,
+  "losses": 8,
+  "pushes": 0,
+  "veto_code_dist": {
+    "ALLOW": 20,
+    "NEWS": 29,
+    "WILSON": 61
+  },
+  "regime_dist": {
+    "CHAOS": 15220,
+    "RANGE": 3773,
+    "TREND": 982,
+    "EXPANSION": 25
+  },
+  "elapsed_sec": 223.6
+}

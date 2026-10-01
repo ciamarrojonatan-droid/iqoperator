@@ -1,0 +1,42 @@
+{
+  "ativo": "AUDUSD",
+  "arquivo": "data/AUDUSD_M5_iq.csv",
+  "hipotese": "H008_REGIME_ADAPTIVE_ENSEMBLE_ROUTER",
+  "payout_usado": 0.87,
+  "horizon_bars": 1,
+  "blocked_hours_utc": [
+    5,
+    8,
+    12,
+    21,
+    23
+  ],
+  "n_barras_total": 20000,
+  "tail_aplicado": null,
+  "n_barras_usadas": 20000,
+  "n_candidates": 103,
+  "n_trades": 21,
+  "vetoed": 82,
+  "purged": 0,
+  "wins": 12,
+  "losses": 8,
+  "pushes": 1,
+  "winrate": 0.6,
+  "ev": 0.12200000000000011,
+  "ev_wlb": -0.2770992478705647,
+  "wilson_lower_bound": 0.38657794231520604,
+  "breakeven_win_rate": 0.53475935828877,
+  "total_pnl": 22.781,
+  "distribuicao_veto_code": {
+    "ALLOW": 21,
+    "NEWS": 33,
+    "WILSON": 49
+  },
+  "distribuicao_regimes": {
+    "CHAOS": 15189,
+    "RANGE": 3943,
+    "TREND": 844,
+    "EXPANSION": 24
+  },
+  "duracao_s": 433.4
+}

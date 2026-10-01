@@ -1,0 +1,93 @@
+{
+  "meta": {
+    "csv": "data/EURUSD_M5_iq.csv",
+    "loader": "DataLoader().load_csv",
+    "rows_loaded": 20000,
+    "rows_used": 20000,
+    "tail_10000_used": false,
+    "load_time_s": 0.03,
+    "hypothesis": "H008RegimeAdaptiveRouter()",
+    "horizon_bars": 1,
+    "blocked_hours_utc": [
+      5,
+      8,
+      12,
+      21,
+      23
+    ],
+    "engine_defaults": "BacktestEngine() defaults",
+    "variable_series_rule": "alternating 0.86/0.90 per calendar day (UTC floor D), index=df.index",
+    "variable_series_mean_payout": 0.8770640000000003,
+    "variable_series_days": 83
+  },
+  "scenarios": {
+    "payout_0.80_fixed": {
+      "payout": 0.8,
+      "payout_mean": 0.8,
+      "breakeven_theoretical": 0.5555555555555556,
+      "n_trades": 0,
+      "wins": 0,
+      "losses": 0,
+      "pushes": 0,
+      "winrate": 0.0,
+      "ev": 0.0,
+      "ev_wlb": 0.0,
+      "wilson_lower_bound": 0.0,
+      "breakeven_win_rate": 0.5555555555555556,
+      "vetoed": 113,
+      "purged": 0,
+      "veto_breakdown": {
+        "PAYOUT": 113
+      },
+      "total_pnl": 0.0,
+      "profit_factor": 0.0,
+      "run_time_s": 199.6
+    },
+    "payout_0.85_fixed": {
+      "payout": 0.85,
+      "payout_mean": 0.85,
+      "breakeven_theoretical": 0.5405405405405405,
+      "n_trades": 20,
+      "wins": 10,
+      "losses": 10,
+      "pushes": 0,
+      "winrate": 0.5,
+      "ev": -0.07500000000000007,
+      "ev_wlb": -0.4463044083048332,
+      "wilson_lower_bound": 0.2992949144298199,
+      "breakeven_win_rate": 0.5405405405405406,
+      "vetoed": 93,
+      "purged": 0,
+      "veto_breakdown": {
+        "ALLOW": 20,
+        "PAYOUT": 93
+      },
+      "total_pnl": -10.130999999999997,
+      "profit_factor": 0.8457286432160804,
+      "run_time_s": 198.8
+    },
+    "payout_0.90_fixed": {
+      "payout": 0.9,
+      "payout_mean": 0.9,
+      "breakeven_theoretical": 0.5263157894736842,
+      "n_trades": 20,
+      "wins": 10,
+      "losses": 10,
+      "pushes": 0,
+      "winrate": 0.5,
+      "ev": -0.04999999999999993,
+      "ev_wlb": -0.4313396625833421,
+      "wilson_lower_bound": 0.2992949144298199,
+      "breakeven_win_rate": 0.5263157894736842,
+      "vetoed": 93,
+      "purged": 0,
+      "veto_breakdown": {
+        "ALLOW": 20,
+        "PAYOUT": 93
+      },
+      "total_pnl": -15.467999999999996,
+      "profit_factor": 0.8899466382070439,
+      "run_time_s": 205.7
+    }
+  }
+}
