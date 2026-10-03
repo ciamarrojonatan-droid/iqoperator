@@ -887,7 +887,7 @@ class Bot:
             return
         self._start_watchdog()
 
-        ml_tag = f"ON(tau={cfg.ML_THRESHOLD})" if (self.ml_filter and self.ml_filter.is_loaded) else "OFF"
+        ml_tag = f"ON(tau={cfg.ML_THRESHOLD})" if (getattr(self.regime_router, 'is_loaded', False)) else "OFF"
         log.info(f"START multi:{len(self.assets)} {','.join(self.assets)} | {cfg.STRATEGY} "
                  f"RSI({cfg.RSI_PERIOD}) {cfg.RSI_OVERSOLD}/{cfg.RSI_OVERBOUGHT} "
                  f"exit={int(cfg.RSI_REQUIRE_EXIT)} H1_EMA={cfg.HTF_EMA} | Kelly "
