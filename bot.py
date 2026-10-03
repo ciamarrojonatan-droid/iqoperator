@@ -102,8 +102,8 @@ class Bot:
         self._trade_log_init()
         self._load_pending()
         self._load_candle_keys()
-        from iq_regime_adaptive.hypotheses.h008_regime_adaptive_router import H008RegimeAdaptiveRouter
-        self.regime_router = H008RegimeAdaptiveRouter()
+        from mhi_ml_router import MHIMLRouter
+        self.regime_router = MHIMLRouter(threshold=0.58)
         self.ml_filter = None
         self.news_filter = NewsFilter()
 
@@ -943,8 +943,9 @@ class Bot:
                     subset = self._next_subset()
                     got = 0
                     current_utc = datetime.now(timezone.utc)
-                    is_toxic = current_utc.hour in cfg.BLOCKED_HOURS_UTC
-                    is_news = self.news_filter.is_news_time(current_utc)
+                    # Forçando False para bater exatamente com o backtest (sem filtros externos)
+                    is_toxic = False 
+                    is_news = False
                     
                     for i, asset in enumerate(subset):
                         self._touch_progress()
@@ -984,12 +985,12 @@ class Bot:
                         if candle_key.startswith("noclock:"):
                             log.warning(f"{asset}: coluna de tempo ausente nos candles â€” avaliando sem dedup por candle.")
 
-                        # H008 Regime-Adaptive Router
+                        # MHIMLRouter
                         signal_series = self.regime_router.generate_signals(df_eval, payout=payout)
                         raw_signal = signal_series.iloc[-1]
                         signal = raw_signal.lower() if raw_signal != "NO_TRADE" else None
                         try:
-                            regime = self.regime_router.classifier.classify_latest(df_eval).regime.value
+                            regime = getattr(self.regime_router, "last_regime", "MHI_ML")
                         except Exception:
                             regime = "?"
                         
