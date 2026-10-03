@@ -6,3 +6,7 @@ numpy
 huggingface_hub
 scikit-learn
 xgboost
+
+hyperopt
+shap
+matplotlib
