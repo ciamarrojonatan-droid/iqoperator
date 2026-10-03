@@ -38,9 +38,16 @@ class MHIMLRouter:
         
         signal_dir = 1 if raw_signal.lower() == "call" else 0
 
+        # Standardize dataframe before passing to ML
+        df_ml = df.copy()
+        if "time" not in df_ml.columns and "from" in df_ml.columns:
+            df_ml["time"] = df_ml["from"]
+        if "datetime" not in df_ml.columns and "time" in df_ml.columns:
+            df_ml["datetime"] = pd.to_datetime(df_ml["time"], unit="s", utc=True)
+
         # Compute features
         try:
-            df_feat = compute_all_features(df)
+            df_feat = compute_all_features(df_ml)
             row_feat = df_feat.iloc[[-1]].copy()
             row_feat["signal_dir"] = signal_dir
             
