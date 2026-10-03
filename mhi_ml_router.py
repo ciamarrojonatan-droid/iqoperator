@@ -51,14 +51,16 @@ class MHIMLRouter:
             row_feat = df_feat.iloc[[-1]].copy()
             row_feat["signal_dir"] = signal_dir
             
-            # Drop excluded columns
-            for c in self.drop_cols:
-                if c in row_feat.columns:
-                    row_feat = row_feat.drop(columns=[c])
-            
             # Predict
             if self.is_loaded:
-                prob = self.clf.predict_proba(row_feat)[0, 1]
+                expected_features = self.clf.get_booster().feature_names
+                # Check for missing features
+                missing = [f for f in expected_features if f not in row_feat.columns]
+                if missing:
+                    raise ValueError(f"Missing features: {missing}")
+                    
+                row_feat_exact = row_feat[expected_features]
+                prob = self.clf.predict_proba(row_feat_exact)[0, 1]
                 if prob >= self.threshold:
                     sig_series.iloc[-1] = raw_signal.upper()
                     self.last_regime = f"ML_PASS({prob:.2f})"
