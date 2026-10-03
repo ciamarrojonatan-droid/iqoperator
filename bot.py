@@ -103,7 +103,7 @@ class Bot:
         self._load_pending()
         self._load_candle_keys()
         from mhi_ml_router import MHIMLRouter
-        self.regime_router = MHIMLRouter(threshold=0.58)
+        self.regime_router = MHIMLRouter(model_path="models/xgb_filter_eurusd_1y.json", threshold=0.58)
         self.ml_filter = None
         self.news_filter = NewsFilter()
 
