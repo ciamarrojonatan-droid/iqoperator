@@ -28,19 +28,19 @@ O bot foi corrigido e encontra-se plenamente operacional e estável no Railway, 
 ### Arquivos Chave Alterados
 - `train_xgb_v2.py`: Corrigida a engenharia de features e vazamento de dados.
 - `mhi_ml_router.py`: Responsável por rodar o sinal de MHI, traduzir colunas do JSON da IQ Option para o Pandas (ex: tratar erro de datetime), extrair as features exatas do XGBoost e devolver o bloqueio ou a autorização de trade (`ML_PASS` vs `ML_BLOCKED`).
-- `bot.py`: Chama o roteador passando o caminho exato do modelo e desativa notícias/horários tóxicos.
+- `bot.py`: Chama o roteador passando o caminho exato do modelo, desativa notícias/horários tóxicos, e implementa **resolução dinâmica e automática de ativos (Forex vs OTC)** com verificação de mercado aberto em tempo real (`_is_market_open`), fallback reativo imediato no `_fire_buy` e sincronização contínua de opcodes em `OP_code.ACTIVES`.
 - `backtest_eurusd_1y.py` / `fetch_eurusdt_1y.py`: Scripts independentes de backtest para validação contra histórico da Binance.
 
 ### Configuração de Produção Recomendada (.env)
 ```env
-IQ_ASSETS="EURUSD-OTC,AUDUSD-OTC,USDCAD-OTC,ETHUSD,AUDJPY-OTC,EURJPY-OTC,EURAUD-OTC,USDCHF-OTC"
+IQ_ASSETS="EURUSD,AUDUSD,USDCAD,ETHUSD,BTCUSD,AUDJPY,EURJPY,EURAUD,USDCHF"
 IQ_TIMEFRAME="60"
 IQ_EXPIRATION="1"
 IQ_BALANCE_TYPE="PRACTICE"
 STRATEGY="mhi_1"
 ML_THRESHOLD="0.58"
 ```
-*(Nota: O uso de `-OTC` é obrigatório aos finais de semana para que o web-socket do bot não entre em timeout no `get_candles` ou `get_balance` quando pede pares abertos mas a bolsa tradicional está fechada).*
+*(Nota: Graças ao mecanismo de resolução dinâmica de ativos adicionado ao `bot.py`, o bot detecta em tempo real se o mercado regular ou OTC está aberto na IQ Option e seleciona a variante correta automaticamente, funcionando 24/7 sem necessidade de alternar o `.env` nos finais de semana).*
 
 ## 3. Próximos Passos
 - **Avaliação do Forward Testing (Ao Vivo):** Deixar o container rodar com o `xgb_filter_eurusd_1y.json` e comparar o log de `[CHECK]` contra a precisão do OOS (se a taxa de `ML_PASS` que gera vitórias vai refletir de forma convergente o que vimos nos 73% de backtest de EUR/USD).

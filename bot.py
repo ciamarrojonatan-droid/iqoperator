@@ -346,7 +346,7 @@ class Bot:
                         log.info(f"Conectado | Conta: {cfg.BALANCE_TYPE} | Saldo: {bal}")
                         try:
                             if hasattr(self.api, "update_ACTIVES_OPCODE"):
-                                ok3, _ = self._call_timeout(self.api.update_ACTIVES_OPCODE, 10.0, "update_ACTIVES_OPCODE")
+                                ok3, _ = self._call_timeout(self.api.update_ACTIVES_OPCODE, 45.0, "update_ACTIVES_OPCODE")
                                 if not ok3:
                                     log.warning(f"update_ACTIVES_OPCODE timeout/erro (tent. {attempt})")
                         except Exception as e:
@@ -461,9 +461,75 @@ class Bot:
         self._touch_progress()
         if not ok:
             log.warning(f"detail fallback: {detail}")
-            return cached  # usa Ãºltimo conhecido (pode ser None)
+            return cached  # usa último conhecido (pode ser None)
+        self._sync_opcodes_from_detail(detail)
         self._detail_cache = (time.time(), detail)
         return detail
+
+    def _sync_opcodes_from_detail(self, detail: dict):
+        """Garante que OP_code.ACTIVES contenha todos os IDs de ativos da corretora."""
+        try:
+            import iqoptionapi.constants as OP_code
+            if isinstance(detail, dict):
+                for name, d in detail.items():
+                    if isinstance(d, dict):
+                        for opt in ("turbo", "binary"):
+                            sub = d.get(opt)
+                            if isinstance(sub, dict) and "id" in sub:
+                                try:
+                                    aid = int(sub["id"])
+                                    OP_code.ACTIVES[name] = aid
+                                    clean = name.replace("-op", "")
+                                    OP_code.ACTIVES[clean] = aid
+                                except (ValueError, TypeError):
+                                    pass
+        except Exception as e:
+            log.debug(f"sync opcodes: {e}")
+
+    def _is_market_open(self, info_dict: dict) -> bool:
+        """Verifica se pelo menos uma modalidade (turbo ou binary) está habilitada e não suspensa."""
+        if not isinstance(info_dict, dict):
+            return False
+        for opt_type in ("turbo", "binary"):
+            sub = info_dict.get(opt_type)
+            if isinstance(sub, dict):
+                enabled = sub.get("enabled", False)
+                suspended = sub.get("is_suspended", False)
+                if enabled is True and not suspended:
+                    return True
+        return False
+
+    def resolve_active_asset(self, asset: str, detail: dict | None = None) -> str:
+        """
+        Resolve dinamicamente o ativo aberto na IQ Option.
+        Ex: se configurado EURUSD mas for final de semana, resolve para EURUSD-OTC.
+        Se configurado EURUSD-OTC mas for dia útil, resolve para EURUSD.
+        """
+        base = asset.replace("-OTC", "").replace("-op", "")
+        now_utc = datetime.now(timezone.utc)
+        # Sexta 21h UTC até Domingo 21h UTC: mercado tradicional fechado (OTC ativo)
+        is_weekend = (now_utc.weekday() == 5) or \
+                     (now_utc.weekday() == 6 and now_utc.hour < 21) or \
+                     (now_utc.weekday() == 4 and now_utc.hour >= 21)
+
+        if isinstance(detail, dict):
+            # Testa se a variante OTC está explicitamente aberta
+            otc_keys = [f"{base}-OTC", f"{base}-OTC-op"]
+            otc_open = any(k in detail and self._is_market_open(detail[k]) for k in otc_keys)
+
+            # Testa se a variante regular está explicitamente aberta
+            reg_keys = [base, f"{base}-op"]
+            reg_open = any(k in detail and self._is_market_open(detail[k]) for k in reg_keys)
+
+            if otc_open and not reg_open:
+                return f"{base}-OTC"
+            if reg_open and not otc_open:
+                return base
+            if otc_open and reg_open:
+                return f"{base}-OTC" if is_weekend else base
+
+        # Fallback por calendário caso detail não determine
+        return f"{base}-OTC" if is_weekend else base
 
     def _log_detail_schema_once(self, detail) -> None:
         """Probe 1x do schema real do payout (só chaves, sem valores sensíveis)."""
@@ -504,7 +570,21 @@ class Bot:
         """Acha o ativo no detail tentando sufixos reais da API (-op, -OTC)."""
         if not isinstance(detail, dict):
             return None, None
-        for key in (asset, f"{asset}-op", f"{asset}-OTC"):
+        base = asset.replace("-OTC", "").replace("-op", "")
+        candidates = [
+            asset,
+            f"{asset}-op",
+            f"{base}-OTC",
+            f"{base}-OTC-op",
+            base,
+            f"{base}-op"
+        ]
+        # 1. Tenta achar candidato comprovadamente aberto
+        for key in candidates:
+            if key in detail and self._is_market_open(detail[key]):
+                return key, detail[key]
+        # 2. Fallback: qualquer candidato presente no detail
+        for key in candidates:
             if key in detail:
                 return key, detail[key]
         return None, None
@@ -603,12 +683,26 @@ class Bot:
             return None
         ok2, order_id = res
         if not ok2:
-            self.buys_rejected += 1
-            log.error(f"Buy rejeitado ({self.buys_rejected}/{self.buys_attempted}): {order_id} (ativo={asset})")
-            if "not available" in str(order_id).lower():
-                self._unavailable_until[asset] = time.time() + 3600
-                log.warning(f"{asset}: marcado CLOSED por 1h (corretora sem oferta) — pulando sem retry.")
-            return None
+            # Fallback reativo: se tentou ativo regular no fds ou vice-versa
+            err_str = str(order_id).lower()
+            if "not available" in err_str:
+                alt_asset = asset[:-4] if asset.endswith("-OTC") else f"{asset}-OTC"
+                log.warning(f"Buy rejeitado para {asset} (not available). Tentando alternativa automática: {alt_asset}")
+                ok_alt, res_alt = self._call_timeout(
+                    lambda: self.api.buy(stake, alt_asset, action, cfg.EXPIRATION),
+                    30, f"buy {alt_asset}")
+                if ok_alt and isinstance(res_alt, tuple) and res_alt[0]:
+                    ok2, order_id = res_alt
+                    asset = alt_asset
+                    log.info(f"Fallback para {alt_asset} aceito com sucesso!")
+
+            if not ok2:
+                self.buys_rejected += 1
+                log.error(f"Buy rejeitado ({self.buys_rejected}/{self.buys_attempted}): {order_id} (ativo={asset})")
+                if "not available" in str(order_id).lower():
+                    self._unavailable_until[asset] = time.time() + 3600
+                    log.warning(f"{asset}: marcado CLOSED por 1h (corretora sem oferta) — pulando sem retry.")
+                return None
         log.info(f"TRADE {action.upper()} {asset} M{cfg.EXPIRATION} stake={stake} id={order_id}")
         return {"order_id": order_id, "asset": asset, "action": action,
                 "stake": stake, "balance_before": balance_before,
@@ -663,6 +757,8 @@ class Bot:
         self.profit += profit
         self.asset_profit[asset] = self.asset_profit.get(asset, 0.0) + profit
         won = profit > 0
+        if asset not in self.history:
+            self.history[asset] = deque(maxlen=cfg.KELLY_LOOKBACK)
         self.history[asset].append(won)
         balance = self._safe_balance()
         tag = "WIN" if won else "LOSS"
@@ -722,13 +818,15 @@ class Bot:
             self._touch_progress()
             os.makedirs(os.path.dirname(cfg.BOT_STATUS) or ".", exist_ok=True)
             per_asset = []
-            for a in self.assets:
-                wr = empirical_winrate(list(self.history[a]), cfg.KELLY_PRIOR,
+            all_known_assets = list(dict.fromkeys(self.assets + list(self.history.keys())))
+            for a in all_known_assets:
+                hist = list(self.history.get(a, []))
+                wr = empirical_winrate(hist, cfg.KELLY_PRIOR,
                                        prior_weight=cfg.KELLY_PRIOR_WEIGHT)
                 per_asset.append({
                     "asset": a,
                     "profit_session": round(self.asset_profit.get(a, 0.0), 2),
-                    "trades": len(self.history[a]),
+                    "trades": len(hist),
                     "winrate": round(wr, 4),
                     "last_signal": self.last_signal.get(a),
                     "last_payout": self.last_payout.get(a),
@@ -923,10 +1021,15 @@ class Bot:
                     # sinal manual tem prioridade (botao cockpit)
                     manual = self._check_manual()
                     if manual:
-                        asset = manual["asset"]
+                        raw_manual_asset = manual["asset"]
+                        asset = self.resolve_active_asset(raw_manual_asset, detail)
+                        if asset not in self.history:
+                            self.history[asset] = deque(maxlen=cfg.KELLY_LOOKBACK)
+                        if asset not in self.asset_profit:
+                            self.asset_profit[asset] = 0.0
                         payout = self.get_payout(asset, detail)
                         if payout < cfg.PAYOUT_MIN:
-                            log.info(f"MANUAL {asset} ignorado: payout {payout:.2f} < mÃ­nimo.")
+                            log.info(f"MANUAL {asset} ignorado: payout {payout:.2f} < mínimo.")
                         else:
                             stake, p, kfull = self._manual_stake(asset, payout, manual["stake"])
                             order = self._fire_buy(asset, manual["signal"], stake)
@@ -947,10 +1050,22 @@ class Bot:
                     is_toxic = False 
                     is_news = False
                     
-                    for i, asset in enumerate(subset):
+                    seen_in_cycle = set()
+                    for i, raw_asset in enumerate(subset):
                         self._touch_progress()
                         if i:
                             time.sleep(cfg.ASSET_DELAY)
+
+                        asset = self.resolve_active_asset(raw_asset, detail)
+                        if asset in seen_in_cycle:
+                            continue
+                        seen_in_cycle.add(asset)
+
+                        if asset not in self.history:
+                            self.history[asset] = deque(maxlen=cfg.KELLY_LOOKBACK)
+                        if asset not in self.asset_profit:
+                            self.asset_profit[asset] = 0.0
+
                         if self._in_cooldown(asset):
                             continue
                         if self._unavailable_until.get(asset, 0) > time.time():
@@ -968,7 +1083,7 @@ class Bot:
                             continue
                         df = self.candles_df(asset, cfg.TIMEFRAME, cfg.CANDLE_COUNT)
                         if df is None or df.empty:
-                            log.warning(f"Sem candles ({asset} M{cfg.EXPIRATION}) â€” aguardando.")
+                            log.warning(f"Sem candles ({asset} M{cfg.EXPIRATION}) — aguardando.")
                             continue
                         got += 1
                         df_eval, forming, candle_ts = self._closed_eval_frame(df)
@@ -983,7 +1098,7 @@ class Bot:
                         self.last_candle_key[asset] = candle_key
                         self._save_candle_keys()
                         if candle_key.startswith("noclock:"):
-                            log.warning(f"{asset}: coluna de tempo ausente nos candles â€” avaliando sem dedup por candle.")
+                            log.warning(f"{asset}: coluna de tempo ausente nos candles — avaliando sem dedup por candle.")
 
                         # MHIMLRouter
                         signal_series = self.regime_router.generate_signals(df_eval, payout=payout)
@@ -997,11 +1112,11 @@ class Bot:
                         self.last_signal[asset] = signal
                         close_px = float(df_eval["close"].iloc[-1])
 
-                        info = "H008_ROUTER"
+                        info = "MHI_ML_ROUTER"
                         payout_src = self.last_payout_src.get(asset, "?")
                         lag_s = int(time.time() - candle_ts) if candle_ts else None
                         forming_s = "dropped" if forming else ("ok" if candle_ts is not None else "noclock")
-                        detail_s = f"close={close_px:.2f} H008 regime={regime} src={payout_src}"
+                        detail_s = f"close={close_px:.2f} MHI regime={regime} src={payout_src}"
                         if lag_s is not None:
                             detail_s += f" lag_s={lag_s}"
                         detail_s += f" forming={forming_s}"
