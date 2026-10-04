@@ -8,6 +8,7 @@ import {
   History,
   Layers,
   Sparkles,
+  Radio,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { StatisticsCard7 } from "@/components/statistics-card-7";
@@ -40,6 +41,9 @@ import { TickerTape } from "@/components/brand/ticker-tape";
 import { SectionHeading } from "@/components/brand/section-heading";
 import { AppSidebar } from "@/components/shell/app-sidebar";
 import { CommandMenu, CommandMenuHint } from "@/components/shell/command-menu";
+import { AudioToggle } from "@/components/audio-toggle";
+import { SignalsHistory } from "@/components/signals-history";
+import { playCallSound, playPutSound, getAudioEnabled } from "@/lib/audio-alerts";
 
 type S = {
   trades: number;
@@ -60,7 +64,7 @@ type B = {
   profit_session: number;
 } | null;
 
-type TabKey = "desempenho" | "analise" | "risco" | "historico" | "todos";
+type TabKey = "desempenho" | "analise" | "sinais" | "risco" | "historico" | "todos";
 
 export default function Dashboard() {
   const [s, setS] = useState<S>({
@@ -77,6 +81,16 @@ export default function Dashboard() {
   const [uptime, setUptime] = useState(0);
   const [msg, setMsg] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<TabKey>("desempenho");
+
+  function handleNewSignal(sig: any) {
+    if (getAudioEnabled() && sig?.status === "APPROVED") {
+      if (sig.direction === "CALL") {
+        playCallSound();
+      } else if (sig.direction === "PUT") {
+        playPutSound();
+      }
+    }
+  }
 
   async function manual(sig: string) {
     setMsg("enviando...");
@@ -115,6 +129,7 @@ export default function Dashboard() {
       if (
         targetId === "desempenho" ||
         targetId === "analise" ||
+        targetId === "sinais" ||
         targetId === "risco" ||
         targetId === "historico" ||
         targetId === "todos"
@@ -207,6 +222,12 @@ export default function Dashboard() {
       count: s.byAsset.length ? `${s.byAsset.length} ativos` : undefined,
     },
     {
+      id: "sinais",
+      label: "Radar de Sinais",
+      icon: Radio,
+      count: "Tempo Real",
+    },
+    {
       id: "risco",
       label: "Risco & Auditoria",
       icon: ShieldAlert,
@@ -243,7 +264,8 @@ export default function Dashboard() {
                 </p>
               )}
             </div>
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-3 flex-wrap">
+              <AudioToggle />
               <SessionClock />
               <StatusPill status={pillStatus} label={pillLabel} />
               <CommandMenuHint />
@@ -388,6 +410,24 @@ export default function Dashboard() {
                 </div>
               </div>
             )}
+
+            {/* Tab: Radar de Sinais */}
+            <div
+              id="sinais"
+              className={cn(
+                "scroll-mt-6 flex flex-col gap-4",
+                activeTab !== "sinais" && activeTab !== "todos" && "hidden"
+              )}
+            >
+              {activeTab === "todos" && (
+                <SectionHeading
+                  icon={Radio}
+                  title="Radar de Sinais & Confluências"
+                  hint="Auditoria em tempo real de confluências MHI e classificação XGBoost nos 30 ativos"
+                />
+              )}
+              <SignalsHistory onNewSignal={handleNewSignal} />
+            </div>
 
             {/* Tab 3: Risco & Auditoria */}
             {(activeTab === "risco" || activeTab === "todos") && (

@@ -11,6 +11,7 @@ import {
   BarChart3,
   ChevronsLeft,
   ChevronsRight,
+  Radio,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Brand, LogoMark } from "@/components/brand/logo";
@@ -21,6 +22,7 @@ const NAV = [
   { href: "#operacao", label: "Operação", Icon: Zap },
   { href: "#desempenho", label: "Desempenho", Icon: Trophy },
   { href: "#analise", label: "Ativos", Icon: BarChart3 },
+  { href: "#sinais", label: "Radar de Sinais", Icon: Radio },
   { href: "#risco", label: "Risco", Icon: ShieldAlert },
   { href: "#historico", label: "Histórico", Icon: History },
 ] as const;

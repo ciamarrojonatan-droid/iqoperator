@@ -11,6 +11,7 @@ import {
   Zap,
   History,
   BarChart3,
+  Radio,
   ArrowUpRight,
   ArrowDownRight,
   Copy,
@@ -34,6 +35,7 @@ const NAV_ITEMS: NavItem[] = [
   { label: "Operação", hash: "#operacao", icon: Zap },
   { label: "Desempenho", hash: "#desempenho", icon: Trophy },
   { label: "Ativos & Deep-Dive", hash: "#analise", icon: BarChart3 },
+  { label: "Radar de Sinais", hash: "#sinais", icon: Radio },
   { label: "Risco", hash: "#risco", icon: ShieldAlert },
   { label: "Histórico", hash: "#historico", icon: History },
 ];

@@ -102,6 +102,8 @@ class Bot:
         self._trade_log_init()
         self._load_pending()
         self._load_candle_keys()
+        self.signals_history: deque = deque(maxlen=cfg.MAX_SIGNALS_HISTORY)
+        self._load_signals_history()
         from mhi_ml_router import MHIMLRouter
         self.regime_router = MHIMLRouter(model_path="models/xgb_filter_eurusd_1y.json", threshold=0.58)
         self.ml_filter = None
@@ -232,6 +234,50 @@ class Bot:
                 json.dump(self.last_candle_key, f)
         except Exception as e:
             log.warning(f"save_candle_keys: {e}")
+
+    def _load_signals_history(self):
+        try:
+            if not os.path.exists(cfg.SIGNALS_LOG):
+                return
+            with open(cfg.SIGNALS_LOG, encoding="utf-8") as f:
+                data = json.load(f)
+            if isinstance(data, list):
+                self.signals_history = deque(data[-cfg.MAX_SIGNALS_HISTORY:], maxlen=cfg.MAX_SIGNALS_HISTORY)
+                if data:
+                    log.info(f"Recuperados {len(self.signals_history)} sinal(is) de {cfg.SIGNALS_LOG}")
+        except Exception as e:
+            log.warning(f"load_signals_history: {e}")
+
+    def _save_signals_history(self):
+        try:
+            os.makedirs(os.path.dirname(cfg.SIGNALS_LOG) or ".", exist_ok=True)
+            tmp_path = f"{cfg.SIGNALS_LOG}.tmp"
+            with open(tmp_path, "w", encoding="utf-8") as f:
+                json.dump(list(self.signals_history), f, indent=2, ensure_ascii=False)
+            os.replace(tmp_path, cfg.SIGNALS_LOG)
+        except Exception as e:
+            log.warning(f"save_signals_history: {e}")
+
+    def _log_signal(self, asset: str, direction: str, status: str, prob: float | None,
+                    payout: float, details: str = "", executed: bool = False, order_id: str | None = None):
+        """Registra sinal (APPROVED ou BLOCKED) no histórico para exibição e áudio no Cockpit."""
+        entry = {
+            "id": f"{int(time.time()*1000)}-{asset}",
+            "time": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S"),
+            "timestamp": time.time(),
+            "asset": asset,
+            "direction": direction.upper(),
+            "status": status,  # "APPROVED" | "BLOCKED"
+            "prob": round(prob, 4) if prob is not None else None,
+            "threshold": cfg.ML_THRESHOLD,
+            "payout": round(payout, 2),
+            "executed": executed,
+            "order_id": order_id,
+            "details": details,
+        }
+        self.signals_history.append(entry)
+        self._save_signals_history()
+        return entry
 
     def _candle_time(self, df):
         """Timestamp (s) da ultima linha via coluna de tempo; None se ausente."""
@@ -869,6 +915,10 @@ class Bot:
                     "buys_rejected": self.buys_rejected,
                     "pending": len(self.pending),
                     "max_concurrent": cfg.MAX_CONCURRENT,
+                    "signals_total": len(self.signals_history),
+                    "signals_approved": sum(1 for s in self.signals_history if s.get("status") == "APPROVED"),
+                    "signals_blocked": sum(1 for s in self.signals_history if s.get("status") == "BLOCKED"),
+                    "last_signal_event": self.signals_history[-1] if self.signals_history else None,
                 }, f)
         except Exception:
             pass
@@ -1030,6 +1080,7 @@ class Bot:
                         payout = self.get_payout(asset, detail)
                         if payout < cfg.PAYOUT_MIN:
                             log.info(f"MANUAL {asset} ignorado: payout {payout:.2f} < mínimo.")
+                            self._log_signal(asset, manual["signal"].upper(), "BLOCKED", None, payout, details=f"Payout {payout:.2f} < {cfg.PAYOUT_MIN:.2f}", executed=False)
                         else:
                             stake, p, kfull = self._manual_stake(asset, payout, manual["stake"])
                             order = self._fire_buy(asset, manual["signal"], stake)
@@ -1038,6 +1089,7 @@ class Bot:
                                               "payout": payout, "p": p, "kfull": kfull})
                                 self.pending.append(order)
                                 self._save_pending()
+                                self._log_signal(asset, manual["signal"].upper(), "APPROVED", p, payout, details="Manual via Cockpit", executed=True, order_id=str(order.get("id", "")))
                                 if len(self.pending) > cfg.MAX_CONCURRENT:
                                     log.warning(f"MANUAL bypass cap ({len(self.pending)}/{cfg.MAX_CONCURRENT} pendentes).")
                         time.sleep(5)
@@ -1109,6 +1161,8 @@ class Bot:
                         except Exception:
                             regime = "?"
                         
+                        candidate = getattr(self.regime_router, "last_candidate", None)
+
                         self.last_signal[asset] = signal
                         close_px = float(df_eval["close"].iloc[-1])
 
@@ -1127,6 +1181,22 @@ class Bot:
                         self.last_regime[asset] = regime
                         if signal or regime != prev_regime:
                             log.info(f"[CHECK] {asset} {candle_key} {detail_s} -> {signal} (payout {payout:.2f})")
+
+                        # Telemetria de sinais no histórico para exibição e alerta sonoro no Cockpit
+                        if candidate:
+                            cand_dir = candidate.get("direction", "CALL")
+                            cand_status = candidate.get("status", "APPROVED" if signal else "BLOCKED")
+                            cand_prob = candidate.get("prob")
+                            self._log_signal(
+                                asset=asset,
+                                direction=cand_dir,
+                                status=cand_status,
+                                prob=cand_prob,
+                                payout=payout,
+                                details=detail_s,
+                                executed=False
+                            )
+
                         self._write_status()
                         
                         if not signal:
@@ -1145,6 +1215,11 @@ class Bot:
                                           "payout": payout, "p": p, "kfull": kfull})
                             self.pending.append(order)
                             self._save_pending()
+                            # Marca sinal recente como executado
+                            if self.signals_history and self.signals_history[-1]["asset"] == asset:
+                                self.signals_history[-1]["executed"] = True
+                                self.signals_history[-1]["order_id"] = str(order.get("id", ""))
+                                self._save_signals_history()
                     if got == 0 and not (is_toxic or is_news):
                         self._empty_scans += 1
                         self._consecutive_global_fails += 1
