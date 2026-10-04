@@ -33,14 +33,15 @@ O bot foi corrigido e encontra-se plenamente operacional e estável no Railway, 
 
 ### Configuração de Produção Recomendada (.env)
 ```env
-IQ_ASSETS="EURUSD,AUDUSD,USDCAD,ETHUSD,BTCUSD,AUDJPY,EURJPY,EURAUD,USDCHF"
+IQ_ASSETS="EURUSD,GBPUSD,USDJPY,AUDUSD,USDCAD,USDCHF,NZDUSD,EURGBP,EURJPY,GBPJPY,AUDJPY,EURAUD,EURCAD,EURNZD,EURCHF,GBPAUD,GBPCAD,GBPCHF,GBPNZD,AUDCAD,AUDNZD,AUDCHF,CADJPY,CHFJPY,CADCHF,NZDJPY,NZDCAD,BTCUSD,ETHUSD,XAUUSD"
+IQ_MAX_CONCURRENT="5"
 IQ_TIMEFRAME="60"
 IQ_EXPIRATION="1"
 IQ_BALANCE_TYPE="PRACTICE"
 STRATEGY="mhi_1"
 ML_THRESHOLD="0.58"
 ```
-*(Nota: Graças ao mecanismo de resolução dinâmica de ativos adicionado ao `bot.py`, o bot detecta em tempo real se o mercado regular ou OTC está aberto na IQ Option e seleciona a variante correta automaticamente, funcionando 24/7 sem necessidade de alternar o `.env` nos finais de semana).*
+*(Nota: Graças ao mecanismo de resolução dinâmica de ativos adicionado ao `bot.py`, o bot detecta em tempo real se o mercado regular ou OTC está aberto na IQ Option e seleciona a variante correta automaticamente para cada um dos 30 ativos, funcionando 24/7 sem necessidade de alternar o `.env` nos finais de semana).*
 
 ## 3. Próximos Passos
 - **Avaliação do Forward Testing (Ao Vivo):** Deixar o container rodar com o `xgb_filter_eurusd_1y.json` e comparar o log de `[CHECK]` contra a precisão do OOS (se a taxa de `ML_PASS` que gera vitórias vai refletir de forma convergente o que vimos nos 73% de backtest de EUR/USD).

@@ -28,7 +28,13 @@ def _get_list(key: str, fallback: list) -> list:
         return [a.strip().upper() for a in raw.split(",") if a.strip()]
     return fallback
 
-DEFAULT_ASSETS = ["EURUSD-OTC", "GBPUSD-OTC", "USDJPY-OTC", "AUDUSD-OTC", "EURGBP-OTC", "USDCAD-OTC"]
+DEFAULT_ASSETS = [
+    "EURUSD", "GBPUSD", "USDJPY", "AUDUSD", "USDCAD", "USDCHF", "NZDUSD",
+    "EURGBP", "EURJPY", "GBPJPY", "AUDJPY", "EURAUD", "EURCAD", "EURNZD", "EURCHF",
+    "GBPAUD", "GBPCAD", "GBPCHF", "GBPNZD", "AUDCAD", "AUDNZD", "AUDCHF",
+    "CADJPY", "CHFJPY", "CADCHF", "NZDJPY", "NZDCAD",
+    "BTCUSD", "ETHUSD", "XAUUSD"
+]
 ASSETS = _get_list("IQ_ASSETS", _get_list("IQ_ASSET", DEFAULT_ASSETS))
 # Sanidade: nomes de ativo válidos (ex.: "EURUSD-OTC"); ignora entradas quebradas
 # (ex. lista colada na variável singular) em vez de travar o loop em reconnect.
@@ -42,24 +48,25 @@ if _BAD:
 if not ASSETS:
     ASSETS = list(DEFAULT_ASSETS)
 # Trava global de exposição: no máximo N posições pendentes simultâneas
-MAX_CONCURRENT = _get_int("IQ_MAX_CONCURRENT", 3)
+MAX_CONCURRENT = _get_int("IQ_MAX_CONCURRENT", 5)
 # Pendências em disco (sobrevivem a restart) e watchdog anti-deadlock
 PENDING_FILE = os.getenv("PENDING_FILE", "data/pending.json")
 WATCHDOG_TIMEOUT = _get_int("WATCHDOG_TIMEOUT", 120)
 # Outage global: após N ciclos consecutivos sem dados de nenhum ativo, restart forçado
 MAX_GLOBAL_ERRORS = _get_int("MAX_GLOBAL_ERRORS", 10)
-# Ritmo do scan multi-ativo (estratégia M15: scan agressivo só gera rate-limit)
-SCAN_SLEEP = _get_int("IQ_SCAN_SLEEP", 45)
-ASSET_DELAY = _get_float("IQ_ASSET_DELAY", 2.0)
+# Configuração de timeframe e expiração (M1 default)
+TIMEFRAME = _get_int("IQ_TIMEFRAME", 60)  # segundos: 60 = M1
+EXPIRATION = _get_int("IQ_EXPIRATION", 1)  # minutos p/ binária (1 minuto)
+# Ritmo do scan multi-ativo ajustado para M1
+SCAN_SLEEP = _get_int("IQ_SCAN_SLEEP", 5 if TIMEFRAME <= 60 else 30)
+ASSET_DELAY = _get_float("IQ_ASSET_DELAY", 0.25 if TIMEFRAME <= 60 else 1.0)
 # Backoff: após N falhas seguidas de candles, pula o ativo por M segundos
 CANDLE_FAIL_LIMIT = _get_int("CANDLE_FAIL_LIMIT", 3)
 CANDLE_COOLDOWN = _get_int("CANDLE_COOLDOWN", 300)
-# Ritmo sustentável: N ativos por ciclo + disjuntor global após scans vazios
-ASSETS_PER_CYCLE = _get_int("IQ_ASSETS_PER_CYCLE", 2)
+# Ritmo sustentável: por padrão escaneia todos os ativos configurados por ciclo
+ASSETS_PER_CYCLE = _get_int("IQ_ASSETS_PER_CYCLE", len(ASSETS))
 GLOBAL_COOLDOWN = _get_int("IQ_GLOBAL_COOLDOWN", 300)
 BALANCE_TTL = _get_int("IQ_BALANCE_TTL", 30)
-TIMEFRAME = _get_int("IQ_TIMEFRAME", 900)  # segundos: 900 = M15
-EXPIRATION = _get_int("IQ_EXPIRATION", 15)  # minutos p/ binária (igual ao M15)
 AMOUNT = _get_float("IQ_AMOUNT", 2.0)
 PAYOUT_MIN = _get_float("IQ_PAYOUT_MIN", 0.70)
 CANDLE_COUNT = _get_int("IQ_CANDLE_COUNT", 120)
@@ -87,7 +94,7 @@ DAILY_META_FILE = os.getenv("DAILY_META_FILE", "data/daily_meta.json")
 MAX_MARTINGALE = _get_int("IQ_MAX_MARTINGALE", 2)
 MARTINGALE_MULTIPLIER = _get_float("IQ_MARTINGALE_MULTIPLIER", 2.0)
 
-STRATEGY = os.getenv("STRATEGY", "donchian_fade")
+STRATEGY = os.getenv("STRATEGY", "mhi_1")
 DONCHIAN_N = _get_int("DONCHIAN_N", 20)
 TREND_EMA = _get_int("TREND_EMA", 200)
 # Higher timeframe p/ setup MTF (H1 = 3600s). HTF_EMA = viés (50 = validado no backtest 1y)
@@ -110,12 +117,12 @@ BB_MULT = _get_float("BB_MULT", 2.0)
 MHI_TREND_EMA = _get_int("IQ_MHI_TREND_EMA", 100)
 MHI_REQUIRE_TREND = os.getenv("IQ_MHI_REQUIRE_TREND", "1") == "1"
 
-# Filtro Preditivo ML (XGBoost tau=0.62 ou Laya)
+# Filtro Preditivo ML (XGBoost tau=0.58 ou Laya)
 USE_ML_FILTER = os.getenv("USE_ML_FILTER", "1") == "1"
 USE_LAYA_ORACLE = os.getenv("USE_LAYA_ORACLE", "0") == "1"
 LAYA_MODEL_NAME = os.getenv("LAYA_MODEL_NAME", "convaiinnovations/laya")
 ML_MODEL_PATH = os.getenv("ML_MODEL_PATH", "models/xgb_filter_v2.pkl")
-ML_THRESHOLD = _get_float("ML_THRESHOLD", 0.62)
+ML_THRESHOLD = _get_float("ML_THRESHOLD", 0.58)
 ML_FAIL_OPEN = os.getenv("ML_FAIL_OPEN", "0") == "1"
 
 # Toxic hours: hours in UTC where trading is blocked
