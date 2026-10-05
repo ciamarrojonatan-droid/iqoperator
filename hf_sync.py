@@ -17,6 +17,8 @@ def _configured() -> bool:
     return bool(os.getenv("HF_TOKEN") and os.getenv("HF_DATASET_REPO"))
 
 
+_repo_ensured = False
+
 def sync_file(local_path: str, repo_path: str | None = None):
     """Upload em thread daemon; silencioso se não configurado."""
     if not _configured():
@@ -28,14 +30,18 @@ def sync_file(local_path: str, repo_path: str | None = None):
     repo_id = os.getenv("HF_DATASET_REPO", "")
 
     def _do():
+        global _repo_ensured
         try:
             from huggingface_hub import HfApi
             api = HfApi(token=token)
             # garante dataset existe (cria se faltar, idempotente)
-            try:
-                api.create_repo(repo_id, repo_type="dataset", exist_ok=True)
-            except Exception:
-                pass
+            if not _repo_ensured:
+                try:
+                    api.create_repo(repo_id, repo_type="dataset", exist_ok=True)
+                except Exception:
+                    pass
+                _repo_ensured = True
+                
             api.upload_file(
                 path_or_fileobj=local_path,
                 path_in_repo=repo_path,
