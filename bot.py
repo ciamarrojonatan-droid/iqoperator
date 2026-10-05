@@ -34,6 +34,8 @@ logging.basicConfig(
     handlers=[logging.FileHandler(cfg.LOG_FILE, encoding="utf-8"),
               logging.StreamHandler()],
 )
+logging.getLogger("huggingface_hub").setLevel(logging.WARNING)
+logging.getLogger("urllib3").setLevel(logging.WARNING)
 log = logging.getLogger("iqrobot")
 
 TRADE_HEADER = ["time", "asset", "signal", "info", "payout", "winrate",
@@ -1121,7 +1123,7 @@ class Bot:
                         if self._in_cooldown(asset):
                             continue
                         if self._unavailable_until.get(asset, 0) > time.time():
-                            log.info(f"VETO {asset} veto_code=UNAVAILABLE sem oferta da corretora (cooldown 1h).")
+                            log.debug(f"VETO {asset} veto_code=UNAVAILABLE sem oferta da corretora (cooldown 1h).")
                             continue
                         if is_toxic:
                             if i == 0: log.info(f"Toxic Hour ({current_utc.hour} UTC) - skipping scan veto_code=TOXIC.")
@@ -1131,7 +1133,7 @@ class Bot:
                             continue
                         payout = self.get_payout(asset, detail)
                         if payout < cfg.PAYOUT_MIN:
-                            log.info(f"VETO {asset} payout={payout:.2f} < minimo veto_code=PAYOUT_MIN.")
+                            log.debug(f"VETO {asset} payout={payout:.2f} < minimo veto_code=PAYOUT_MIN.")
                             continue
                         df = self.candles_df(asset, cfg.TIMEFRAME, cfg.CANDLE_COUNT)
                         if df is None or df.empty:
