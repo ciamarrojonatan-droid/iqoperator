@@ -124,7 +124,7 @@ USE_ML_FILTER = os.getenv("USE_ML_FILTER", "1") == "1"
 USE_LAYA_ORACLE = os.getenv("USE_LAYA_ORACLE", "0") == "1"
 LAYA_MODEL_NAME = os.getenv("LAYA_MODEL_NAME", "convaiinnovations/laya")
 ML_MODEL_PATH = os.getenv("ML_MODEL_PATH", "models/xgb_filter_v2.pkl")
-ML_THRESHOLD = _get_float("ML_THRESHOLD", 0.58)
+ML_THRESHOLD = _get_float("ML_THRESHOLD", 0.61)
 ML_FAIL_OPEN = os.getenv("ML_FAIL_OPEN", "0") == "1"
 
 # Toxic hours: hours in UTC where trading is blocked
