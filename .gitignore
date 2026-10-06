@@ -1,4 +1,8 @@
 .env
+.env.*
+data/*_lab.*
+data/trades_lab.csv
+data/trades_live_backup_*.csv
 __pycache__/
 .venv/
 *.log
