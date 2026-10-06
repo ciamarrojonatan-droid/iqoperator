@@ -124,6 +124,6 @@ ML_MODEL_PATH = os.getenv("ML_MODEL_PATH", "models/xgb_filter_v2.pkl")
 ML_THRESHOLD = _get_float("ML_THRESHOLD", 0.61)
 ML_FAIL_OPEN = os.getenv("ML_FAIL_OPEN", "0") == "1"
 
-# Toxic hours: hours in UTC where trading is blocked
-BLOCKED_HOURS_UTC = [int(h) for h in _get_list("BLOCKED_HOURS_UTC", ["5", "8", "12", "21", "23"])]
+# Toxic hours: hours in UTC where trading is blocked (desativado por padrão)
+BLOCKED_HOURS_UTC = [int(h) for h in _get_list("BLOCKED_HOURS_UTC", []) if h.isdigit()]
 

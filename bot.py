@@ -1109,8 +1109,8 @@ class Bot:
                     subset = self._next_subset()
                     got = 0
                     current_utc = datetime.now(timezone.utc)
-                    # Horários tóxicos ativados (ex: 23h UTC rollover que causou o drawdown)
-                    is_toxic = current_utc.hour in cfg.BLOCKED_HOURS_UTC
+                    # Filtro de toxic hours desativado conforme solicitado
+                    is_toxic = False
                     is_news = False
                     
                     seen_in_cycle = set()
