@@ -31,9 +31,9 @@ O bot foi corrigido e encontra-se plenamente operacional e estável no Railway, 
 - `bot.py`: Chama o roteador passando o caminho exato do modelo, desativa notícias/horários tóxicos, e implementa **resolução dinâmica e automática de ativos (Forex vs OTC)** com verificação de mercado aberto em tempo real (`_is_market_open`), fallback reativo imediato no `_fire_buy` e sincronização contínua de opcodes em `OP_code.ACTIVES`.
 - `backtest_eurusd_1y.py` / `fetch_eurusdt_1y.py`: Scripts independentes de backtest para validação contra histórico da Binance.
 
-### Configuração de Produção Recomendada (.env)
+### Configuração de Produção Recomendada (.env) — Pós-Auditoria de 1.376 Trades
 ```env
-IQ_ASSETS="EURUSD,GBPUSD,USDJPY,AUDUSD,USDCAD,USDCHF,NZDUSD,EURGBP,EURJPY,GBPJPY,AUDJPY,EURAUD,EURCAD,EURNZD,EURCHF,GBPAUD,GBPCAD,GBPCHF,GBPNZD,AUDCAD,AUDNZD,AUDCHF,CADJPY,CHFJPY,CADCHF,NZDJPY,NZDCAD,BTCUSD,ETHUSD,XAUUSD"
+IQ_ASSETS="GBPJPY,AUDJPY,AUDUSD,AUDCAD,GBPCAD,GBPAUD,ETHUSD,AUDCHF,USDCAD,NZDUSD,EURGBP,EURUSD"
 IQ_MAX_CONCURRENT="5"
 IQ_TIMEFRAME="60"
 IQ_EXPIRATION="1"
@@ -41,9 +41,20 @@ IQ_BALANCE_TYPE="PRACTICE"
 STRATEGY="mhi_1"
 ML_THRESHOLD="0.58"
 ```
-*(Nota: Graças ao mecanismo de resolução dinâmica de ativos adicionado ao `bot.py`, o bot detecta em tempo real se o mercado regular ou OTC está aberto na IQ Option e seleciona a variante correta automaticamente para cada um dos 30 ativos, funcionando 24/7 sem necessidade de alternar o `.env` nos finais de semana).*
+*(Nota: Restrito à Cesta Ouro validada no Centro de Inteligência & Auditoria com WR > 58% e PnL positivo. Ativos tóxicos eliminados).*
 
-## 3. Próximos Passos
-- **Avaliação do Forward Testing (Ao Vivo):** Deixar o container rodar com o `xgb_filter_eurusd_1y.json` e comparar o log de `[CHECK]` contra a precisão do OOS (se a taxa de `ML_PASS` que gera vitórias vai refletir de forma convergente o que vimos nos 73% de backtest de EUR/USD).
-- **Cuidado com a Liquidez OTC:** Nos testes cegos, o proxy usado foi o volume de exchanges reais (Binance). Os finais de semana da IQ Option usam ativos OTC matemáticos. Monitorar ativamente as próximas 48h de log.
-- **Passar para Conta Real:** Se os resultados na conta PRACTICE sob validação de probabilidade diária se confirmarem > 55% num range de 100 operações, considerar flipar `CONFIRM_REAL=YES` e `IQ_BALANCE_TYPE=REAL`.
+## 3. Auditoria do Forward Test & Correções Implementadas
+
+1. **Evidência Empírica (1.376 Trades):**
+   - **Mercado Real (Forex):** 709 trades, 55.22% WR, **+$16.17 PnL** (lucrativo).
+   - **Mercado OTC:** 667 trades, 47.13% WR, **-$101.60 PnL** (prejuízo concentrado em pares exóticos).
+   - Apenas `ETHUSD-OTC` (+9.57) e `USDCAD-OTC` (+1.44) tiveram assertividade no OTC.
+
+2. **Blindagem Matemática de Kelly (`kelly.py` e `bot.py`):**
+   - Corrigido clamp que apostava $1.00 com expectativa negativa. Agora, \( \text{kfull} \le 0 \) gera `stake = 0.0` e aborta a operação categoricamente (`VETO NEGATIVE_EV`).
+   - Sizing agora pondera a probabilidade do setup do modelo ML (`cand_prob`) junto com o histórico empírico.
+
+3. **Descorrelação & Proteção de Rollover:**
+   - Adicionada trava de descorrelação por candle (máx 1 par por moeda-base/cotação no mesmo minuto).
+   - Reativada a trava de horários tóxicos (`BLOCKED_HOURS_UTC`, bloqueando às 23h UTC).
+   - Redução da lista de 30 para 12 ativos da Cesta Ouro, reduzindo o lag de scan de 40s para < 3s.

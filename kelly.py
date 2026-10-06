@@ -11,14 +11,14 @@ def kelly_fraction_stake(balance: float, payout: float, winrate: float,
     Retorna (stake, kelly_full).
     """
     if balance <= 0:
-        return min_amount, 0.0
+        return 0.0, 0.0
     if payout <= 0:
         payout = 0.80
     p = min(max(winrate, 0.0), 0.99)
     q = 1.0 - p
     kelly_full = (payout * p - q) / payout
     if kelly_full <= 0:
-        return min_amount, kelly_full
+        return 0.0, round(kelly_full, 4)
     stake = balance * kelly_full * fraction
     cap = balance * max_risk
     stake = min(stake, cap)

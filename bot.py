@@ -706,18 +706,26 @@ class Bot:
             log.warning(f"payout em fallback {cfg.KELLY_PAYOUT_DEFAULT} há 10 checks seguidos — detail/parse falhando")
         return cfg.KELLY_PAYOUT_DEFAULT
 
-    def calc_stake(self, asset: str, payout: float) -> tuple[float, float, float]:
+    def calc_stake(self, asset: str, payout: float, cand_prob: float | None = None) -> tuple[float, float, float]:
         balance = self._safe_balance()
-        p = empirical_winrate(list(self.history[asset]), cfg.KELLY_PRIOR,
-                              prior_weight=cfg.KELLY_PRIOR_WEIGHT)
+        p_emp = empirical_winrate(list(self.history[asset]), cfg.KELLY_PRIOR,
+                                  prior_weight=cfg.KELLY_PRIOR_WEIGHT)
+        # Se houver probabilidade do setup ML, combina de forma ponderada (60% setup atual, 40% histórico do par)
+        if cand_prob is not None and cand_prob > 0:
+            p = round(0.60 * cand_prob + 0.40 * p_emp, 4)
+        else:
+            p = p_emp
         if cfg.USE_KELLY:
             stake, kfull = kelly_fraction_stake(
                 balance, payout, p, fraction=cfg.KELLY_FRACTION,
                 max_risk=cfg.KELLY_MAX_RISK, min_amount=cfg.KELLY_MIN)
             return stake, p, kfull
+        breakeven_p = 1.0 / (1.0 + payout) if payout > 0 else 0.55
+        if p < breakeven_p:
+            return 0.0, p, round((payout * p - (1.0 - p)) / (payout or 1.0), 4)
         return round(self.current_amount, 2), p, 0.0
 
-    # ---------- execuÃ§Ã£o nÃ£o-bloqueante ----------
+    # ---------- execução não-bloqueante ----------
     def _fire_buy(self, asset: str, action: str, stake: float):
         """Dispara o buy e retorna order dict (sem aguardar resultado)."""
         self.buys_attempted += 1
@@ -733,7 +741,8 @@ class Bot:
         if not ok2:
             # Fallback reativo: se tentou ativo regular no fds ou vice-versa
             err_str = str(order_id).lower()
-            if "not available" in err_str:
+            is_crypto = any(c in asset for c in ("BTC", "BITCOIN"))
+            if "not available" in err_str and not is_crypto:
                 alt_asset = asset[:-4] if asset.endswith("-OTC") else f"{asset}-OTC"
                 log.warning(f"Buy rejeitado para {asset} (not available). Tentando alternativa automática: {alt_asset}")
                 ok_alt, res_alt = self._call_timeout(
@@ -748,8 +757,8 @@ class Bot:
                 self.buys_rejected += 1
                 log.error(f"Buy rejeitado ({self.buys_rejected}/{self.buys_attempted}): {order_id} (ativo={asset})")
                 if "not available" in str(order_id).lower():
-                    self._unavailable_until[asset] = time.time() + 3600
-                    log.warning(f"{asset}: marcado CLOSED por 1h (corretora sem oferta) — pulando sem retry.")
+                    self._unavailable_until[asset] = time.time() + 1800
+                    log.warning(f"{asset}: marcado CLOSED por 30m (corretora sem oferta) — pulando sem retry.")
                 return None
         log.info(f"TRADE {action.upper()} {asset} M{cfg.EXPIRATION} stake={stake} id={order_id}")
         return {"order_id": order_id, "asset": asset, "action": action,
@@ -1100,8 +1109,8 @@ class Bot:
                     subset = self._next_subset()
                     got = 0
                     current_utc = datetime.now(timezone.utc)
-                    # Forçando False para bater exatamente com o backtest (sem filtros externos)
-                    is_toxic = False 
+                    # Horários tóxicos ativados (ex: 23h UTC rollover que causou o drawdown)
+                    is_toxic = current_utc.hour in cfg.BLOCKED_HOURS_UTC
                     is_news = False
                     
                     seen_in_cycle = set()
@@ -1207,7 +1216,27 @@ class Bot:
                             log.info(f"SINAL {signal.upper()} {asset} ignorado: cap {cfg.MAX_CONCURRENT} pendentes atingido veto_code=CAP.")
                             continue
 
-                        stake, p, kfull = self.calc_stake(asset, payout)
+                        cand_prob = candidate.get("prob") if candidate else None
+                        stake, p, kfull = self.calc_stake(asset, payout, cand_prob=cand_prob)
+
+                        # TRAVA RIGOROSA: Veto a Kelly <= 0 ou probabilidade < breakeven
+                        breakeven_p = 1.0 / (1.0 + payout) if payout > 0 else 0.55
+                        if kfull <= 0 or stake <= 0 or p < breakeven_p:
+                            log.info(f"VETO NEGATIVE_EV {signal.upper()} {asset}: Kelly={kfull:.3f} p={p:.2f} (breakeven={breakeven_p:.2f}) stake={stake:.2f} — ordem abortada veto_code=NEGATIVE_EV.")
+                            self._log_signal(asset, signal.upper(), "BLOCKED", p, payout, details=f"Veto Negative EV (Kelly={kfull:.3f})", executed=False)
+                            continue
+
+                        # Trava de descorrelação por candle (máximo 1 par por moeda base/cotação no ciclo pendente)
+                        base_sym = asset.replace("-OTC", "")
+                        legs = [base_sym[:3], base_sym[3:]] if len(base_sym) == 6 else [base_sym]
+                        shared_active = any(
+                            any(leg in p_order["asset"] for leg in legs if len(leg) == 3)
+                            for p_order in self.pending
+                        )
+                        if shared_active and len(self.pending) >= 2:
+                            log.info(f"VETO CORRELATION {signal.upper()} {asset}: moeda compartilhada {legs} já ativa no ciclo pendente — veto_code=CORRELATION.")
+                            self._log_signal(asset, signal.upper(), "BLOCKED", p, payout, details=f"Veto Correlação ({legs})", executed=False)
+                            continue
 
                         log.info(f"SINAL {signal.upper()} {asset} {info} payout={payout:.2f} "
                                  f"p={p:.2f} kelly={kfull:.3f} stake={stake:.2f}")

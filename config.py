@@ -29,11 +29,8 @@ def _get_list(key: str, fallback: list) -> list:
     return fallback
 
 DEFAULT_ASSETS = [
-    "EURUSD", "GBPUSD", "USDJPY", "AUDUSD", "USDCAD", "USDCHF", "NZDUSD",
-    "EURGBP", "EURJPY", "GBPJPY", "AUDJPY", "EURAUD", "EURCAD", "EURNZD", "EURCHF",
-    "GBPAUD", "GBPCAD", "GBPCHF", "GBPNZD", "AUDCAD", "AUDNZD", "AUDCHF",
-    "CADJPY", "CHFJPY", "CADCHF", "NZDJPY", "NZDCAD",
-    "BTCUSD", "ETHUSD", "XAUUSD"
+    "GBPJPY", "AUDJPY", "AUDUSD", "AUDCAD", "GBPCAD", "GBPAUD", "ETHUSD", "AUDCHF",
+    "USDCAD", "NZDUSD", "EURGBP", "EURUSD"
 ]
 ASSETS = _get_list("IQ_ASSETS", _get_list("IQ_ASSET", DEFAULT_ASSETS))
 # Sanidade: nomes de ativo válidos (ex.: "EURUSD-OTC"); ignora entradas quebradas
