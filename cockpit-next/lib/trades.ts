@@ -2,14 +2,38 @@ import fs from "fs";
 import path from "path";
 export type Trade = { time:string; asset?:string; signal:string; info:string; payout:string; winrate:string; kelly:string; stake:string; profit:string; balance:string };
 export type AssetStat = { asset:string; trades:number; wins:number; winrate:number; profit:number };
+function clean(s?: string | null): string {
+  return (s || "").trim();
+}
+
 function resolve(p:string){
+  p = clean(p);
+  if(!p) return p;
   if(path.isAbsolute(p)) return p;
   const cand = [path.join(process.cwd(), p), path.join(process.cwd(),"..",p), path.join("/app", p)];
   for(const c of cand) if(fs.existsSync(c)) return c;
   return cand[1];
 }
 export function readTrades(): Trade[]{
-  const p = resolve(process.env.TRADE_LOG || "data/trades_live.csv");
+  let target = clean(process.env.TRADE_LOG);
+  if(!target){
+    const pLab = resolve("data/trades_lab.csv");
+    const pProd = resolve("data/trades_live.csv");
+    if(fs.existsSync(pLab) && fs.existsSync(pProd)){
+      try {
+        const mLab = fs.statSync(pLab).mtimeMs;
+        const mProd = fs.statSync(pProd).mtimeMs;
+        target = mLab > mProd ? "data/trades_lab.csv" : "data/trades_live.csv";
+      } catch {
+        target = "data/trades_live.csv";
+      }
+    } else if (fs.existsSync(pLab)) {
+      target = "data/trades_lab.csv";
+    } else {
+      target = "data/trades_live.csv";
+    }
+  }
+  const p = resolve(target);
   try{
     const raw=fs.readFileSync(p,"utf-8").trim();
     if(!raw) return [];
@@ -39,5 +63,5 @@ export function stats(){
     winrate: e.trades ? e.wins/e.trades : 0,
     profit: Math.round(e.profit*100)/100,
   })).sort((x,y)=>y.profit-x.profit);
-  return { trades:n, wins, winrate:wr, profit:Math.round(profit*100)/100, balance:bal, byAsset, last: rows.slice(-10).reverse() };
+  return { trades:n, wins, winrate:wr, profit:Math.round(profit*100)/100, balance:bal, byAsset, last: [...rows].reverse() };
 }

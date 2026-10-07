@@ -15,7 +15,21 @@ import {
   Search,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { SignalRecord } from "@/app/api/signals/route";
+export type SignalRecord = {
+  id: string;
+  time: string;
+  timestamp: number;
+  asset: string;
+  direction: "CALL" | "PUT";
+  status: "APPROVED" | "BLOCKED";
+  prob: number | null;
+  threshold: number;
+  payout: number;
+  executed: boolean;
+  order_id?: string | null;
+  details?: string;
+  profit?: number | null;
+};
 
 export function SignalsHistory({
   className,
@@ -28,6 +42,9 @@ export function SignalsHistory({
   const [total, setTotal] = useState(0);
   const [approvedCount, setApprovedCount] = useState(0);
   const [blockedCount, setBlockedCount] = useState(0);
+  const [executedCount, setExecutedCount] = useState(0);
+  const [winCount, setWinCount] = useState(0);
+  const [lossCount, setLossCount] = useState(0);
   const [assetsList, setAssetsList] = useState<string[]>([]);
   const [selectedAsset, setSelectedAsset] = useState<string>("ALL");
   const [selectedStatus, setSelectedStatus] = useState<string>("ALL");
@@ -49,6 +66,9 @@ export function SignalsHistory({
       setTotal(data.total || 0);
       setApprovedCount(data.approved_count || 0);
       setBlockedCount(data.blocked_count || 0);
+      setExecutedCount(data.executed_count || 0);
+      setWinCount(data.win_count || 0);
+      setLossCount(data.loss_count || 0);
       if (data.assets?.length) setAssetsList(data.assets);
 
       const incoming: SignalRecord[] = data.signals || [];
@@ -120,7 +140,7 @@ export function SignalsHistory({
       </div>
 
       {/* KPI Cards Row */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
         <div className="bg-surface-elevated/70 border border-border rounded-lg p-3">
           <span className="text-[11px] text-muted flex items-center gap-1">
             <Layers size={12} /> Total de Sinais
@@ -149,6 +169,22 @@ export function SignalsHistory({
             <span className="text-xs text-muted font-mono">
               ({(100 - approvalRate).toFixed(1)}%)
             </span>
+          </div>
+        </div>
+
+        <div className="bg-surface-elevated/70 border border-border rounded-lg p-3">
+          <span className="text-[11px] text-muted flex items-center gap-1">
+            <TrendingUp size={12} className="text-blue-400" /> Executados
+          </span>
+          <div className="flex items-baseline gap-2 mt-0.5">
+            <p className="text-lg font-bold text-blue-400">{executedCount}</p>
+            {executedCount > 0 && (
+              <span className="text-[10px] flex items-center gap-1 font-mono">
+                <span className="text-emerald-400">{winCount}W</span>
+                <span className="text-muted">/</span>
+                <span className="text-rose-400">{lossCount}L</span>
+              </span>
+            )}
           </div>
         </div>
 
@@ -362,18 +398,39 @@ export function SignalsHistory({
                     {/* Execution details */}
                     <td className="py-2 px-3 whitespace-nowrap">
                       {sig.executed ? (
-                        <span className="text-emerald-400 font-semibold flex items-center gap-1">
-                          <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-                          Ordem Executada
-                          {sig.order_id && (
-                            <span className="text-[10px] text-muted font-mono">
-                              #{sig.order_id.slice(-4)}
+                        sig.profit !== undefined && sig.profit !== null ? (
+                          sig.profit > 0 ? (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+                              WIN (+R$ {sig.profit.toFixed(2)})
                             </span>
-                          )}
+                          ) : sig.profit < 0 ? (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-rose-500/15 text-rose-400 border border-rose-500/30">
+                              LOSS (R$ {sig.profit.toFixed(2)})
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-muted/20 text-muted border border-border">
+                              EMPATE
+                            </span>
+                          )
+                        ) : (
+                          <span className="text-emerald-400 font-semibold flex items-center gap-1">
+                            <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                            Em andamento...
+                            {sig.order_id && (
+                              <span className="text-[10px] text-muted font-mono">
+                                #{sig.order_id.slice(-4)}
+                              </span>
+                            )}
+                          </span>
+                        )
+                      ) : sig.details && (sig.details.includes("Veto") || sig.details.includes("Filtro")) ? (
+                        <span className="text-amber-400/90 font-medium text-[11px] flex items-center gap-1">
+                          <span className="h-1 w-1 rounded-full bg-amber-400"></span>
+                          {sig.details}
                         </span>
                       ) : isApproved ? (
                         <span className="text-muted text-[11px]">
-                          Veto de Exposição / Cap
+                          {sig.details || "Aguardando Confirmação"}
                         </span>
                       ) : (
                         <span className="text-muted text-[11px]">

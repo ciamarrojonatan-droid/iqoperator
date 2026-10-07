@@ -39,8 +39,7 @@ export function WinrateTrend({
     if (!trades || trades.length === 0) return []
     const chrono = [...trades].reverse()
     return chrono.map((t, i) => {
-      const start = Math.max(0, i - WINDOW + 1)
-      const slice = chrono.slice(start, i + 1)
+      const slice = chrono.slice(0, i + 1)
       const wins = slice.filter(isWin).length
       return {
         trade: i + 1,
@@ -127,7 +126,7 @@ export function WinrateTrend({
 
       {data.length > 0 && (
         <p className="mt-2 text-[11px] text-muted font-mono">
-          Winrate móvel (janela de {WINDOW} trades) · break-even {BREAKEVEN}% · meta {THRESHOLD}%
+          Winrate cumulativo total da sessão · break-even {BREAKEVEN}% · meta {THRESHOLD}%
         </p>
       )}
     </div>

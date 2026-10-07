@@ -58,9 +58,12 @@ MAX_GLOBAL_ERRORS = _get_int("MAX_GLOBAL_ERRORS", 10)
 # Configuração de timeframe e expiração (M1 default)
 TIMEFRAME = _get_int("IQ_TIMEFRAME", 60)  # segundos: 60 = M1
 EXPIRATION = _get_int("IQ_EXPIRATION", 1)  # minutos p/ binária (1 minuto)
-# Ritmo do scan multi-ativo ajustado para M1
-SCAN_SLEEP = _get_int("IQ_SCAN_SLEEP", 5 if TIMEFRAME <= 60 else 30)
-ASSET_DELAY = _get_float("IQ_ASSET_DELAY", 0.25 if TIMEFRAME <= 60 else 1.0)
+# Ritmo do scan multi-ativo ajustado para M1 (latência ultra-baixa)
+SCAN_SLEEP = _get_int("IQ_SCAN_SLEEP", 1 if TIMEFRAME <= 60 else 10)
+ASSET_DELAY = _get_float("IQ_ASSET_DELAY", 0.0)
+MAX_ENTRY_DELAY = _get_float("IQ_MAX_ENTRY_DELAY", 3.5)  # teto de 3.5s na vela M1 p/ evitar slippage
+SYNC_CANDLE_CLOCK = os.getenv("SYNC_CANDLE_CLOCK", "1") == "1"  # sincroniza varredura no segundo :59.2
+CANDLE_TIMEOUT = _get_float("IQ_CANDLE_TIMEOUT", 2.5)  # timeout rápido por ativo
 # Backoff: após N falhas seguidas de candles, pula o ativo por M segundos
 CANDLE_FAIL_LIMIT = _get_int("CANDLE_FAIL_LIMIT", 3)
 CANDLE_COOLDOWN = _get_int("CANDLE_COOLDOWN", 300)
@@ -70,7 +73,7 @@ GLOBAL_COOLDOWN = _get_int("IQ_GLOBAL_COOLDOWN", 300)
 BALANCE_TTL = _get_int("IQ_BALANCE_TTL", 30)
 AMOUNT = _get_float("IQ_AMOUNT", 2.0)
 PAYOUT_MIN = _get_float("IQ_PAYOUT_MIN", 0.70)
-CANDLE_COUNT = _get_int("IQ_CANDLE_COUNT", 120)
+CANDLE_COUNT = _get_int("IQ_CANDLE_COUNT", 65)  # 65 velas cobrem Donchian(60) e SMA(50) com metade do payload
 
 # Kelly fracionário (substitui valor fixo quando USE_KELLY=1)
 # Breakeven p/ payout 0.80 = 1/1.8 = 0.5556. Prior 0.58 = edge pequeno e conservador.
@@ -109,7 +112,7 @@ TRADE_LOG = os.getenv("TRADE_LOG", "data/trades_live.csv")
 MANUAL_SIGNAL = os.getenv("MANUAL_SIGNAL", "data/manual_signal.json")
 BOT_STATUS = os.getenv("BOT_STATUS", "data/bot_status.json")
 SIGNALS_LOG = os.getenv("SIGNALS_LOG", "data/signals_log.json")
-MAX_SIGNALS_HISTORY = _get_int("MAX_SIGNALS_HISTORY", 500)
+MAX_SIGNALS_HISTORY = _get_int("MAX_SIGNALS_HISTORY", 50000)
 EMA_FAST = _get_int("EMA_FAST", 9)
 EMA_SLOW = _get_int("EMA_SLOW", 21)
 RSI_PERIOD = _get_int("RSI_PERIOD", 14)
@@ -119,6 +122,8 @@ BB_PERIOD = _get_int("BB_PERIOD", 20)
 BB_MULT = _get_float("BB_MULT", 2.0)
 MHI_TREND_EMA = _get_int("IQ_MHI_TREND_EMA", 100)
 MHI_REQUIRE_TREND = os.getenv("IQ_MHI_REQUIRE_TREND", "1") == "1"
+MHI_EARLY_CHECK = os.getenv("MHI_EARLY_CHECK", "1") == "1"
+MHI_SAFE_BODY_PERCENTAGE = _get_float("MHI_SAFE_BODY_PERCENTAGE", 0.4)
 
 # Filtro Preditivo ML (XGBoost tau=0.58 ou Laya)
 USE_ML_FILTER = os.getenv("USE_ML_FILTER", "1") == "1"
@@ -127,6 +132,11 @@ LAYA_MODEL_NAME = os.getenv("LAYA_MODEL_NAME", "convaiinnovations/laya")
 ML_MODEL_PATH = os.getenv("ML_MODEL_PATH", "models/xgb_filter_v2.pkl")
 ML_THRESHOLD = _get_float("ML_THRESHOLD", 0.61)
 ML_FAIL_OPEN = os.getenv("ML_FAIL_OPEN", "0") == "1"
+
+# HFT Institutional Features
+CORRELATION_THRESHOLD = _get_float("CORRELATION_THRESHOLD", 0.85)
+LIQUIDITY_ANOMALY_THRESHOLD = _get_float("LIQUIDITY_ANOMALY_THRESHOLD", 0.3)
+DYNAMIC_KELLY = os.getenv("DYNAMIC_KELLY", "1") == "1"
 
 # Toxic hours: hours in UTC where trading is blocked (desativado por padrão)
 BLOCKED_HOURS_UTC = [int(h) for h in _get_list("BLOCKED_HOURS_UTC", []) if h.isdigit()]

@@ -88,6 +88,8 @@ class Bot:
         self.last_candle_key: dict[str, str] = {}
         self._dedup_count: dict[str, int] = {}
         self.last_check: dict[str, str] = {}
+        self._scheduled_orders: list[dict] = []
+        self._latest_closes: dict[str, pd.Series] = {}
         self.pending: list[dict] = []
         self.martingale_step = 0
         self.current_amount = cfg.AMOUNT
@@ -110,6 +112,49 @@ class Bot:
         self.regime_router = MHIMLRouter(model_path="models/xgb_filter_eurusd_1y.json", threshold=0.58)
         self.ml_filter = None
         self.news_filter = NewsFilter()
+
+        # Scheduler Daemon para disparos sincronizados
+        self._scheduler_lock = threading.Lock()
+        threading.Thread(target=self._scheduler_loop, daemon=True).start()
+
+    def _scheduler_loop(self):
+        while True:
+            time.sleep(0.05)
+            sec = time.time() % getattr(cfg, "TIMEFRAME", 60)
+            if sec >= 59.8 and self._scheduled_orders:
+                with self._scheduler_lock:
+                    orders_to_fire = list(self._scheduled_orders)
+                    self._scheduled_orders.clear()
+                
+                if orders_to_fire:
+                    log.info(f"DISPARANDO {len(orders_to_fire)} ORDENS ENGATILHADAS (LATÊNCIA ZERO) EM PARALELO AOS {sec:.2f}s!")
+                    for o in orders_to_fire:
+                        threading.Thread(target=self._execute_scheduled, args=(o,), daemon=True).start()
+                time.sleep(1.0) # evita re-disparo no mesmo segundo
+                
+    def _execute_scheduled(self, order_params):
+        asset = order_params["asset"]
+        signal = order_params["signal"]
+        stake = order_params["stake"]
+        payout = order_params["payout"]
+        info = order_params["info"]
+        p = order_params["p"]
+        kfull = order_params["kfull"]
+        
+        log.info(f"SINAL {signal.upper()} {asset} {info} payout={payout:.2f} p={p:.2f} kelly={kfull:.3f} stake={stake:.2f}")
+        order = self._fire_buy(asset, signal, stake)
+        if order:
+            order.update({"signal": signal, "info": info, "payout": payout, "p": p, "kfull": kfull})
+            with self._scheduler_lock:
+                self.pending.append(order)
+                self._save_pending()
+                # Find the most recent signal for this asset in the history and mark it as executed
+                for idx in range(len(self.signals_history) - 1, -1, -1):
+                    if self.signals_history[idx]["asset"] == asset:
+                        self.signals_history[idx]["executed"] = True
+                        self.signals_history[idx]["order_id"] = str(order.get("order_id", ""))
+                        self._save_signals_history()
+                        break
 
 
     # ---------- chamadas com timeout ----------
@@ -256,17 +301,43 @@ class Bot:
             tmp_path = f"{cfg.SIGNALS_LOG}.tmp"
             with open(tmp_path, "w", encoding="utf-8") as f:
                 json.dump(list(self.signals_history), f, indent=2, ensure_ascii=False)
-            os.replace(tmp_path, cfg.SIGNALS_LOG)
+            
+            # Retry loop for os.replace to handle Windows WinError 32 (file in use by Next.js)
+            for attempt in range(5):
+                try:
+                    os.replace(tmp_path, cfg.SIGNALS_LOG)
+                    break
+                except OSError as e:
+                    if attempt == 4:
+                        log.warning(f"save_signals_history final fail: {e}")
+                    import time
+                    time.sleep(0.2)
         except Exception as e:
-            log.warning(f"save_signals_history: {e}")
+            log.warning(f"save_signals_history fatal: {e}")
 
     def _log_signal(self, asset: str, direction: str, status: str, prob: float | None,
                     payout: float, details: str = "", executed: bool = False, order_id: str | None = None):
         """Registra sinal (APPROVED ou BLOCKED) no histórico para exibição e áudio no Cockpit."""
+        now_ts = time.time()
+        for entry in reversed(list(self.signals_history)[-10:]):
+            if entry.get("asset") == asset and (now_ts - entry.get("timestamp", 0)) < 5.0:
+                entry["direction"] = direction.upper()
+                entry["status"] = status
+                if prob is not None:
+                    entry["prob"] = round(prob, 4)
+                entry["payout"] = round(payout, 2)
+                entry["executed"] = executed
+                if order_id:
+                    entry["order_id"] = order_id
+                if details:
+                    entry["details"] = details
+                self._save_signals_history()
+                return entry
+
         entry = {
-            "id": f"{int(time.time()*1000)}-{asset}",
+            "id": f"{int(now_ts*1000)}-{asset}",
             "time": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S"),
-            "timestamp": time.time(),
+            "timestamp": now_ts,
             "asset": asset,
             "direction": direction.upper(),
             "status": status,  # "APPROVED" | "BLOCKED"
@@ -473,14 +544,16 @@ class Bot:
 
     # ---------- dados ----------
     def candles_df(self, asset: str, timeframe: int, count: int,
-                   timeout: float = 30) -> pd.DataFrame | None:
-        # A lib entra em `while True + reconnect` se a conexÃ£o cair no meio do
-        # get_candles â€” sem timeout, 1 ativo congela o scan inteiro (e o heartbeat).
+                   timeout: float | None = None) -> pd.DataFrame | None:
+        if timeout is None:
+            timeout = cfg.CANDLE_TIMEOUT
+        # A lib entra em `while True + reconnect` se a conexão cair no meio do
+        # get_candles — sem timeout, 1 ativo congela o scan inteiro (e o heartbeat).
         # Roda com prazo: estourou, pula o ativo neste ciclo.
         self._touch_progress()
         ok, res = self._call_timeout(
             lambda: self.api.get_candles(asset, timeframe, count, time.time(), timeout=timeout),
-            timeout + 2.0, f"get_candles {asset}")
+            timeout + 1.0, f"get_candles {asset}")
         self._touch_progress()
         if not ok:
             self._note_candle_fail(asset, str(res))
@@ -706,7 +779,7 @@ class Bot:
             log.warning(f"payout em fallback {cfg.KELLY_PAYOUT_DEFAULT} há 10 checks seguidos — detail/parse falhando")
         return cfg.KELLY_PAYOUT_DEFAULT
 
-    def calc_stake(self, asset: str, payout: float, cand_prob: float | None = None) -> tuple[float, float, float]:
+    def calc_stake(self, asset: str, payout: float, cand_prob: float | None = None, kelly_mult: float = 1.0) -> tuple[float, float, float]:
         balance = self._safe_balance()
         p_emp = empirical_winrate(list(self.history[asset]), cfg.KELLY_PRIOR,
                                   prior_weight=cfg.KELLY_PRIOR_WEIGHT)
@@ -716,8 +789,9 @@ class Bot:
         else:
             p = p_emp
         if cfg.USE_KELLY:
+            fraction = cfg.KELLY_FRACTION * kelly_mult
             stake, kfull = kelly_fraction_stake(
-                balance, payout, p, fraction=cfg.KELLY_FRACTION,
+                balance, payout, p, fraction=fraction,
                 max_risk=cfg.KELLY_MAX_RISK, min_amount=cfg.KELLY_MIN)
             return stake, p, kfull
         breakeven_p = 1.0 / (1.0 + payout) if payout > 0 else 0.55
@@ -727,39 +801,51 @@ class Bot:
 
     # ---------- execução não-bloqueante ----------
     def _fire_buy(self, asset: str, action: str, stake: float):
-        """Dispara o buy e retorna order dict (sem aguardar resultado)."""
+        """Dispara o buy usando req_id único (thread-safe para execuções simultâneas em concorrência zero-latency)."""
         self.buys_attempted += 1
         balance_before = self._safe_balance()
-        ok, res = self._call_timeout(
-            lambda: self.api.buy(stake, asset, action, cfg.EXPIRATION),
-            30, f"buy {asset}")
-        if not ok:
+        
+        # Gera um req_id único para não colidir com outras threads no iqoptionapi
+        import random
+        req_id = f"buy_{int(time.time()*1000)}_{random.randint(1000, 9999)}"
+        
+        if not hasattr(self.api.api, 'buy_multi_option'):
+            self.api.api.buy_multi_option = {}
+        self.api.api.buy_multi_option[req_id] = {}
+        
+        import iqoptionapi.constants as OP_code
+        active_id = OP_code.ACTIVES.get(asset)
+        if not active_id:
             self.buys_rejected += 1
-            log.error(f"Buy TIMEOUT ({self.buys_rejected}/{self.buys_attempted}): {res} (ativo={asset})")
+            log.error(f"Buy rejeitado: Ativo {asset} ID não encontrado no OP_code.ACTIVES")
             return None
-        ok2, order_id = res
-        if not ok2:
-            # Fallback reativo: se tentou ativo regular no fds ou vice-versa
-            err_str = str(order_id).lower()
-            is_crypto = any(c in asset for c in ("BTC", "BITCOIN"))
-            if "not available" in err_str and not is_crypto:
-                alt_asset = asset[:-4] if asset.endswith("-OTC") else f"{asset}-OTC"
-                log.warning(f"Buy rejeitado para {asset} (not available). Tentando alternativa automática: {alt_asset}")
-                ok_alt, res_alt = self._call_timeout(
-                    lambda: self.api.buy(stake, alt_asset, action, cfg.EXPIRATION),
-                    30, f"buy {alt_asset}")
-                if ok_alt and isinstance(res_alt, tuple) and res_alt[0]:
-                    ok2, order_id = res_alt
-                    asset = alt_asset
-                    log.info(f"Fallback para {alt_asset} aceito com sucesso!")
-
-            if not ok2:
+            
+        # Dispara via websocket imediatamente
+        self.api.api.buyv3(stake, active_id, action, cfg.EXPIRATION, req_id)
+        
+        # Aguarda a resposta para ESTE req_id específico
+        start_t = time.time()
+        order_id = None
+        while order_id is None:
+            try:
+                if "message" in self.api.api.buy_multi_option[req_id]:
+                    msg = self.api.api.buy_multi_option[req_id]["message"]
+                    self.buys_rejected += 1
+                    log.error(f"Buy rejeitado ({self.buys_rejected}/{self.buys_attempted}): {msg} (ativo={asset})")
+                    return None
+            except Exception:
+                pass
+            try:
+                order_id = self.api.api.buy_multi_option[req_id].get("id")
+            except Exception:
+                pass
+                
+            if time.time() - start_t >= 5:
                 self.buys_rejected += 1
-                log.error(f"Buy rejeitado ({self.buys_rejected}/{self.buys_attempted}): {order_id} (ativo={asset})")
-                if "not available" in str(order_id).lower():
-                    self._unavailable_until[asset] = time.time() + 1800
-                    log.warning(f"{asset}: marcado CLOSED por 30m (corretora sem oferta) — pulando sem retry.")
+                log.error(f"Buy TIMEOUT (sem resp. do socket 5s) ativo={asset}")
                 return None
+            time.sleep(0.02)
+            
         log.info(f"TRADE {action.upper()} {asset} M{cfg.EXPIRATION} stake={stake} id={order_id}")
         return {"order_id": order_id, "asset": asset, "action": action,
                 "stake": stake, "balance_before": balance_before,
@@ -785,6 +871,15 @@ class Bot:
 
     def _settle(self, order: dict, profit: float, estimated: bool = False):
         tag = "RESULT_TIMEOUT(est)" if estimated else ("WIN" if profit > 0 else "LOSS")
+        
+        # Registra lucro no signal_history para o dashboard
+        order_id = str(order.get("order_id"))
+        for s in reversed(list(self.signals_history)):
+            if s.get("order_id") == order_id:
+                s["profit"] = round(profit, 2)
+                break
+        self._save_signals_history()
+        
         self.update_result(order["asset"], order.get("signal") or order["action"],
                            order.get("info") or "AUTO", order.get("payout") or 0,
                            order.get("p") or 0, order.get("kfull") or 0,
@@ -847,11 +942,16 @@ class Bot:
         return False
 
     def _next_subset(self) -> list[str]:
-        """Round-robin: N ativos por ciclo (corta a taxa de requests sem perder cobertura)."""
-        n = max(1, min(cfg.ASSETS_PER_CYCLE, len(self.assets)))
-        subset = [self.assets[(self._asset_cursor + i) % len(self.assets)] for i in range(n)]
-        self._asset_cursor = (self._asset_cursor + n) % len(self.assets)
-        return subset
+        """Prioriza ativos por payout e disponibilidade para garantir que os melhores pares sejam avaliados no segundo zero."""
+        def _prio(a):
+            if self._in_cooldown(a) or self._unavailable_until.get(a, 0) > time.time():
+                return -1.0
+            p = self.last_payout.get(a)
+            return p if p is not None else 0.85
+
+        ordered = sorted(self.assets, key=_prio, reverse=True)
+        n = max(1, min(cfg.ASSETS_PER_CYCLE, len(ordered)))
+        return ordered[:n]
 
     def _candle_key(self, df) -> str:
         """Chave robusta do Ãºltimo candle (vÃ¡rias versÃµes da API usam 'from'/'at'/etc)."""
@@ -1027,13 +1127,44 @@ class Bot:
             loss_target = cfg.STOP_LOSS
             loss_profit = self.profit
 
-        if loss_profit <= -loss_target:
+        if loss_target > 0 and loss_profit <= -loss_target:
             log.error(f"Stop loss atingido: profit={loss_profit:.2f} <= limite=-{loss_target:.2f}")
             return True
-        if daily_profit >= win_target:
+        if win_target > 0 and daily_profit >= win_target:
             log.info(f"Stop win atingido: profit={daily_profit:.2f} >= meta={win_target:.2f}")
             return True
+
+        if current_balance is not None and current_balance < cfg.KELLY_MIN:
+            log.error(f"Capital esgotado para o teste: saldo={current_balance:.2f} < mínimo={cfg.KELLY_MIN:.2f}")
+            return True
+
         return False
+
+    def _sync_wait_next_cycle(self):
+        """Sincroniza o relógio (com suporte a Multi-Stage Wakeup para MHI)."""
+        self._touch_progress()
+        if not cfg.SYNC_CANDLE_CLOCK:
+            time.sleep(cfg.SCAN_SLEEP)
+            return
+
+        now = time.time()
+        sec = now % cfg.TIMEFRAME
+        min_mod = (int(now) // 60) % 5
+        
+        wait_s = (cfg.TIMEFRAME - sec) + 59.2
+        if sec < 59.2:
+            wait_s = 59.2 - sec
+
+        if getattr(cfg, "MHI_EARLY_CHECK", True) and cfg.STRATEGY == "mhi_1" and min_mod == 4:
+            if sec < 30.0:
+                wait_s = 30.0 - sec
+            elif sec < 55.0:
+                wait_s = 55.0 - sec
+
+        if wait_s > 1.0:
+            self.homeostasis.sleep_with_heartbeat(wait_s)
+        else:
+            time.sleep(max(0.05, wait_s))
 
     def run(self):
         if not cfg.EMAIL or not cfg.PASSWORD:
@@ -1044,6 +1175,27 @@ class Bot:
             return
         if not self.connect():
             return
+            
+        detail = self._fetch_detail()
+        new_assets = []
+        for a in self.assets:
+            resolved = self.resolve_active_asset(a, detail)
+            new_assets.append(resolved)
+                
+        old_assets = self.assets
+        self.assets = list(dict.fromkeys(new_assets))
+        if old_assets != self.assets:
+            log.info(f"Ativos normalizados (redirecionando para OTC/abertos): {self.assets}")
+            self.asset_profit = {a: 0.0 for a in self.assets}
+            self.history = {a: deque(maxlen=cfg.KELLY_LOOKBACK) for a in self.assets}
+            self.last_signal = {a: None for a in self.assets}
+            self.last_payout = {a: None for a in self.assets}
+            self.last_check = {a: None for a in self.assets}
+            self.last_payout_src = {a: "unknown" for a in self.assets}
+            self.last_candle_key = {a: None for a in self.assets}
+            self.last_regime = {a: "?" for a in self.assets}
+            self._dedup_count = {a: 0 for a in self.assets}
+            
         self._start_watchdog()
 
         ml_tag = f"ON(tau={cfg.ML_THRESHOLD})" if (getattr(self.regime_router, 'is_loaded', False)) else "OFF"
@@ -1117,7 +1269,10 @@ class Bot:
                     for i, raw_asset in enumerate(subset):
                         self._touch_progress()
                         if i:
-                            time.sleep(cfg.ASSET_DELAY)
+                            if getattr(cfg, "STRATEGY", "") == "mhi_1" and (int(time.time()) // 60) % 5 == 4:
+                                time.sleep(0.1)
+                            else:
+                                time.sleep(cfg.ASSET_DELAY)
 
                         asset = self.resolve_active_asset(raw_asset, detail)
                         if asset in seen_in_cycle:
@@ -1150,10 +1305,41 @@ class Bot:
                             continue
                         got += 1
                         df_eval, forming, candle_ts = self._closed_eval_frame(df)
-                        if df_eval is None or df_eval.empty:
-                            log.warning(f"Sem candle fechado ({asset}) — so forming disponivel.")
-                            continue
-                        candle_key = self._candle_key(df_eval)
+                        if df_eval is not None and not df_eval.empty:
+                            self._latest_closes[asset] = df_eval["close"]
+                        
+                        is_mhi_early_trigger = getattr(cfg, "MHI_EARLY_CHECK", True) and cfg.STRATEGY == "mhi_1"
+                        sec_into_candle = time.time() % cfg.TIMEFRAME
+                        is_mhi_minute = is_mhi_early_trigger and (int(time.time()) // 60) % 5 == 4
+
+                        if is_mhi_minute and any(o["asset"] == asset for o in self._scheduled_orders):
+                            continue # Já engatilhou, ignora até o disparo
+                            
+                        if is_mhi_minute and forming and not df.empty:
+                            df_eval = df # Injeta vela em formação para predição
+                            
+                            # FILTRO HFT INSTITUCIONAL: Perigo de Inversão (Safety Distance)
+                            if sec_into_candle < 54.0:
+                                last_row = df.iloc[-1]
+                                current_open = float(last_row.get("open", 0))
+                                current_close = float(last_row.get("close", 0))
+                                
+                                body_sizes = [abs(float(r.get("close", 0)) - float(r.get("open", 0))) for _, r in df.iloc[-6:-1].iterrows()]
+                                avg_body = sum(body_sizes) / len(body_sizes) if body_sizes else 0.0001
+                                current_body = abs(current_close - current_open)
+                                
+                                # Exige no minimo 50% do corpo médio para engatilhar antecipado
+                                if current_body < (avg_body * 0.5):
+                                    continue # Pula a avaliação e deixa o loop rodar até os 55s
+                            
+                            # Sufixo dinâmico para evitar dedup
+                            candle_key = f"{self._candle_key(df_eval)}_live_{int(sec_into_candle//10)}" 
+                        else:
+                            if df_eval is None or df_eval.empty:
+                                log.warning(f"Sem candle fechado ({asset}) — so forming disponivel.")
+                                continue
+                            candle_key = self._candle_key(df_eval)
+
                         if candle_key == self.last_candle_key.get(asset):
                             self._dedup_count[asset] = self._dedup_count.get(asset, 0) + 1
                             log.debug(f"DEDUP_SKIP {asset} {candle_key} veto_code=DEDUP n={self._dedup_count[asset]}")
@@ -1212,12 +1398,50 @@ class Bot:
                         
                         if not signal:
                             continue
+
+                        # TRAVA RIGOROSA ANTI-SLIPPAGE: Veto a entrada tardia na vela M1 (Bypass se for disparo agendado do MHI)
+                        sec_into_candle = time.time() % cfg.TIMEFRAME
+                        if not is_mhi_minute and sec_into_candle > cfg.MAX_ENTRY_DELAY:
+                            log.warning(f"VETO LATE_ENTRY {signal.upper()} {asset}: atraso de {sec_into_candle:.1f}s na vela M1 (teto={cfg.MAX_ENTRY_DELAY:.1f}s) — ordem abortada para evitar loss por slippage veto_code=LATE_ENTRY.")
+                            self._log_signal(asset, signal.upper(), "BLOCKED", prob=candidate.get("prob") if candidate else None, payout=payout, details=f"Veto Entrada Tardia ({sec_into_candle:.1f}s > {cfg.MAX_ENTRY_DELAY:.1f}s)", executed=False)
+                            continue
+
                         if len(self.pending) >= cfg.MAX_CONCURRENT:
                             log.info(f"SINAL {signal.upper()} {asset} ignorado: cap {cfg.MAX_CONCURRENT} pendentes atingido veto_code=CAP.")
                             continue
 
+                        # INSTITUTIONAL FEATURE 2: Liquidity Anomaly (Tick Imbalance)
+                        if forming and not df.empty and "volume" in df.columns and len(df) > 10:
+                            vol_current = float(df["volume"].iloc[-1])
+                            vol_avg = float(df["volume"].iloc[-11:-1].mean())
+                            if sec_into_candle > 5 and vol_avg > 0:
+                                rate_current = vol_current / sec_into_candle
+                                rate_avg = vol_avg / 60.0
+                                if rate_current < rate_avg * getattr(cfg, "LIQUIDITY_ANOMALY_THRESHOLD", 0.3):
+                                    log.warning(f"VETO LIQUIDITY {signal.upper()} {asset}: Volume de ticks secou ({rate_current:.1f}/s vs {rate_avg:.1f}/s). Possível gap veto_code=LIQUIDITY_ANOMALY.")
+                                    self._log_signal(asset, signal.upper(), "BLOCKED", prob=candidate.get("prob") if candidate else None, payout=payout, details="Veto Anomalia Liquidez", executed=False)
+                                    continue
+
+                        # INSTITUTIONAL FEATURE 3: Dynamic Kelly (ATR Scaling)
+                        kelly_mult = 1.0
+                        if getattr(cfg, "DYNAMIC_KELLY", True) and df_eval is not None and len(df_eval) >= 50:
+                            highs = df_eval["high"]
+                            lows = df_eval["low"]
+                            closes = df_eval["close"]
+                            tr1 = highs - lows
+                            tr2 = (highs - closes.shift()).abs()
+                            tr3 = (lows - closes.shift()).abs()
+                            tr = pd.concat([tr1, tr2, tr3], axis=1).max(axis=1)
+                            atr_short = float(tr.iloc[-5:].mean())
+                            atr_long = float(tr.iloc[-50:].mean())
+                            if atr_long > 0:
+                                vol_ratio = atr_short / atr_long
+                                kelly_mult = max(0.5, min(1.5, vol_ratio))
+                                if kelly_mult != 1.0:
+                                    log.debug(f"ATR SCALING {asset}: Multiplicador de Kelly={kelly_mult:.2f}x (Ratio={vol_ratio:.2f})")
+
                         cand_prob = candidate.get("prob") if candidate else None
-                        stake, p, kfull = self.calc_stake(asset, payout, cand_prob=cand_prob)
+                        stake, p, kfull = self.calc_stake(asset, payout, cand_prob=cand_prob, kelly_mult=kelly_mult)
 
                         # TRAVA RIGOROSA: Veto a Kelly <= 0 ou probabilidade < breakeven
                         breakeven_p = 1.0 / (1.0 + payout) if payout > 0 else 0.55
@@ -1236,6 +1460,57 @@ class Bot:
                         if shared_active and len(self.pending) >= 2:
                             log.info(f"VETO CORRELATION {signal.upper()} {asset}: moeda compartilhada {legs} já ativa no ciclo pendente — veto_code=CORRELATION.")
                             self._log_signal(asset, signal.upper(), "BLOCKED", p, payout, details=f"Veto Correlação ({legs})", executed=False)
+                            continue
+
+                        # INSTITUTIONAL FEATURE 1: Pearson Correlation Matrix
+                        corr_threshold = getattr(cfg, "CORRELATION_THRESHOLD", 0.85)
+                        pearson_veto = False
+                        s1 = self._latest_closes.get(asset)
+                        if s1 is not None and len(s1) >= 30:
+                            for p_order in self.pending + self._scheduled_orders:
+                                s2 = self._latest_closes.get(p_order["asset"])
+                                if s2 is not None and len(s2) >= 30:
+                                    try:
+                                        corr = s1.iloc[-30:].pct_change().corr(s2.iloc[-30:].pct_change())
+                                        if abs(corr) > corr_threshold:
+                                            pearson_veto = True
+                                            log.warning(f"VETO PEARSON_CORRELATION {signal.upper()} {asset}: {corr*100:.1f}% de correlação com {p_order['asset']} (limiar {corr_threshold*100:.1f}%) — veto_code=PEARSON.")
+                                            self._log_signal(asset, signal.upper(), "BLOCKED", p, payout, details=f"Pearson Corr {corr*100:.1f}% > {corr_threshold*100:.0f}%", executed=False)
+                                            break
+                                    except Exception:
+                                        pass
+                        if pearson_veto:
+                            continue
+                            
+                        # MHI Early Schedule Logic
+                        if is_mhi_minute:
+                            open_px = float(df_eval["open"].iloc[-1])
+                            close_px = float(df_eval["close"].iloc[-1])
+                            body_size = abs(close_px - open_px)
+                            
+                            recent_bodies = abs(df_eval["close"].iloc[-11:-1] - df_eval["open"].iloc[-11:-1])
+                            avg_body = recent_bodies.mean() if not recent_bodies.empty else 0.0001
+                            safe_pct = getattr(cfg, "MHI_SAFE_BODY_PERCENTAGE", 0.4)
+                            is_safe = body_size >= (avg_body * safe_pct)
+                            
+                            if sec_into_candle < 45.0: # Check aos 30s
+                                if not is_safe:
+                                    log.info(f"MHI EARLY CHECK {asset}: Doji/Risco detectado (corpo {body_size:.5f} < min {avg_body * safe_pct:.5f}). Adiando p/ 55s.")
+                                    continue
+                                log.info(f"MHI EARLY CHECK {asset}: Vela Segura (corpo {body_size:.5f}). Sinal {signal.upper()} ENGATILHADO antecipadamente!")
+                            else:
+                                log.info(f"MHI LATE CHECK {asset}: Verificação final aos {sec_into_candle:.1f}s. Engatilhando sinal {signal.upper()}.")
+                                
+                            with getattr(self, "_scheduler_lock", threading.Lock()):
+                                self._scheduled_orders.append({
+                                    "asset": asset, "signal": signal, "stake": stake,
+                                    "payout": payout, "p": p, "kfull": kfull, "info": info, "cand_prob": cand_prob
+                                })
+                            continue
+                            
+                        if getattr(cfg, "STRATEGY", "") == "mhi_1" and not is_mhi_minute:
+                            # Se for MHI 1, jamais executa de forma síncrona "atrasada" fora do minuto correto
+                            log.warning(f"VETO LATE_MHI: MHI só pode ser agendado no minuto correto. Ignorando {asset} aos {sec_into_candle:.1f}s.")
                             continue
 
                         log.info(f"SINAL {signal.upper()} {asset} {info} payout={payout:.2f} "
@@ -1270,11 +1545,13 @@ class Bot:
                         self._hard_reconnect_count = 0  # conexÃ£o saudÃ¡vel, reseta
                     self._touch_progress()
                     errors = 0
-                    time.sleep(cfg.SCAN_SLEEP)
+                    self._sync_wait_next_cycle()
                 except KeyboardInterrupt:
                     raise
                 except Exception as e:
                     errors += 1
+                    import traceback
+                    traceback.print_exc()
                     log.error(f"Erro no loop ({errors}): {e}")
                     self.homeostasis.sleep_with_heartbeat(min(60.0 * errors, 300.0))
                     self._touch_progress()

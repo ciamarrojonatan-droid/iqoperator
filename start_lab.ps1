@@ -16,9 +16,11 @@ if (-not (Test-Path $pythonExe)) {
 # Define as variaveis de isolamento
 $env:ENV_FILE = ".env.lab"
 $env:TRADE_LOG = "data/trades_lab.csv"
+$env:BOT_STATUS = "data/bot_status_lab.json"
+$env:SIGNALS_LOG = "data/signals_log_lab.json"
 
 Write-Host "[1/3] Iniciando Cockpit do Laboratorio na porta 3000..." -ForegroundColor Yellow
-Start-Process -FilePath "cmd.exe" -ArgumentList "/c set TRADE_LOG=data/trades_lab.csv && npm --prefix cockpit-next start -- -p 3000" -WindowStyle Minimized
+Start-Process -FilePath "cmd.exe" -ArgumentList "/c npm --prefix cockpit-next start -- -p 3000" -WindowStyle Minimized
 
 Write-Host "[2/3] Abrindo Centro de Inteligencia em http://localhost:3000..." -ForegroundColor Cyan
 Start-Sleep -Seconds 3

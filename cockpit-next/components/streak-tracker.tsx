@@ -69,8 +69,8 @@ export function StreakTracker({ trades }: StreakTrackerProps) {
   }
   const currentLabel = `${currentCount}${lastIsWin ? "W" : "L"}`;
 
-  // Últimos 10 resultados, mais recente à direita
-  const last10 = [...trades.slice(0, 10)].reverse();
+  // Últimos 100 resultados (visual), mais recente à direita
+  const lastN = [...trades.slice(0, 100)].reverse();
 
   return (
     <div className="bg-surface border border-border rounded-lg p-4">
@@ -106,9 +106,9 @@ export function StreakTracker({ trades }: StreakTrackerProps) {
       </div>
 
       <div className="mt-3">
-        <p className="text-muted text-xs mb-2">Últimos 10</p>
+        <p className="text-muted text-xs mb-2">Últimos {lastN.length}</p>
         <div className="flex items-center gap-1.5 flex-wrap">
-          {last10.map((trade, index) => {
+          {lastN.map((trade, index) => {
             const win = isWin(trade);
             const profitVal = parseProfit(trade?.profit ?? trade?.pnl);
             const profitLabel = !isNaN(profitVal)
